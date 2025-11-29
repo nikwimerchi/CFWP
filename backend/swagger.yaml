@@ -1,0 +1,392 @@
+swagger: "2.0"
+info:
+  title: "Your API"
+  version: "1.0.0"
+securityDefinitions:
+  BearerAuth:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: Bearer authentication token
+
+tags:
+  - name: Child health care portal
+    description: API Documentation
+
+paths:
+  # [POST] login
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login
+      parameters:
+        - name: body
+          in: body
+          description: login Data
+          required: true
+          schema:
+            $ref: "#/definitions/loginData"
+      responses:
+        201:
+          description: "Logged in"
+        400:
+          description: "Bad Request"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+  # [POST] signup
+  /api/v1/auth/signup:
+    post:
+      tags:
+        - Authentication
+      summary: User Signup
+      parameters:
+        - name: body
+          in: body
+          description: Signup Data
+          required: true
+          schema:
+            $ref: "#/definitions/signupData"
+      responses:
+        201:
+          description: "User account created"
+        400:
+          description: "Bad Request"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+    # [POST] signup
+
+  # [POST] logout
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout
+      responses:
+        201:
+          description: "User account created"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+
+  # [GET] users
+  /api/v1/users:
+    get:
+      tags:
+        - users
+      summary: Find All Users
+      responses:
+        200:
+          description: "OK"
+        500:
+          description: "Server Error"
+
+    # [POST] users
+    post:
+      tags:
+        - users
+      summary: Add User
+      parameters:
+        - name: body
+          in: body
+          description: user Data
+          required: true
+          schema:
+            $ref: "#/definitions/users"
+      responses:
+        201:
+          description: "Created"
+        400:
+          description: "Bad Request"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+  # [GET] users/id
+  /api/v1/auth/users/{id}:
+    get:
+      tags:
+        - users
+      summary: Find User By Id
+      parameters:
+        - name: id
+          in: path
+          description: User Id
+          required: true
+      responses:
+        200:
+          description: "OK"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+    # [PUT] users/id
+    put:
+      tags:
+        - users
+      summary: Update User By Id
+      parameters:
+        - name: id
+          in: path
+          description: user Id
+          required: true
+        - name: body
+          in: body
+          description: user Data
+          required: true
+          schema:
+            $ref: "#/definitions/users"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+    # [DELETE] users/id
+    delete:
+      tags:
+        - users
+      summary: Delete User By Id
+      parameters:
+        - name: id
+          in: path
+          description: user Id
+          required: true
+      responses:
+        200:
+          description: "OK"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+
+# [GET] Child
+  /api/v1/child:
+    get:
+      tags:
+        - child
+      summary: Find All children
+      responses:
+        200:
+          description: "OK"
+        500:
+          description: "Server Error"
+
+    # [POST] child
+    post:
+      tags:
+        - child
+      summary: Add Child
+      parameters:
+        - name: Authorization
+          in: header
+          description: Authentication token
+          required: true
+          type: string
+          format: Bearer <token>
+        - name: body
+          in: body
+          description: child Data
+          required: true
+          schema:
+            $ref: "#/definitions/child"
+      responses:
+        201:
+          description: "Created"
+        400:
+          description: "Bad Request"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+  # [GET] child/id
+  /api/v1/child/{id}:
+    get:
+      tags:
+        - child
+      summary: Find Child By Id
+      parameters:
+        - name: id
+          in: path
+          description: Child Id
+          required: true
+      responses:
+        200:
+          description: "OK"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+    # [PUT] child/id
+    put:
+      tags:
+        - child
+      summary: Update Child By Id
+      parameters:
+        - name: id
+          in: path
+          description: child Id
+          required: true
+        - name: body
+          in: body
+          description: child Data
+          required: true
+          schema:
+            $ref: "#/definitions/child"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+    # [DELETE] child/id
+    delete:
+      tags:
+        - child
+      summary: Delete Child By Id
+      parameters:
+        - name: id
+          in: path
+          description: child Id
+          required: true
+      responses:
+        200:
+          description: "OK"
+        409:
+          description: "Conflict"
+        500:
+          description: "Server Error"
+
+# definitions
+definitions:
+  users:
+    type: object
+    required:
+      - email
+      - password
+    properties:
+      email:
+        type: string
+        description: user Email
+      password:
+        type: string
+        description: user Password
+  child:
+    type: object
+    required:
+      - firstName
+      - lastName
+      - age
+      - address
+      - parentId
+      - registeredBy
+    properties:
+      firstName:
+        type: string
+        description: child first name
+      lastName:
+        type: string
+        description: child last name
+      age:
+        type: number
+        description: child age
+      address:
+        $ref: '#/definitions/address'
+      parentId:
+        type: string
+        description: child parentId
+      registeredBy:
+        $ref: '#/definitions/registeredBy'
+  # Login data
+  loginData:
+    type: object
+    required:
+      - email
+      - password
+    properties:
+      email:
+        type: string
+        description: user Email
+      password:
+        type: string
+        description: user Password
+  # signup data
+  signupData:
+    type: object
+    required:
+      - names
+      - email
+      - password
+      - address
+      - role
+
+    properties:
+      names:
+        type: string
+        description: user fullname
+      email:
+        type: string
+        description: user Email
+      password:
+        type: string
+        description: user Password
+      address:
+        type: object
+        description: user full address
+      role:
+        type: string
+        description: user role either parent or advisor
+
+# registered by 
+  registeredBy:
+    type: object
+    properties:
+      userId:
+        type: string
+        description: ID of the user who registered the child
+      role:
+        type: string
+        description: Role of the user who registered the child
+# registered by 
+  address:
+    type: object
+    properties:
+      province:
+        type: string
+        description: privince of child
+      district:
+        type: string
+        description: district of child
+      sector:
+        type: string
+        description: sector of child
+      cell:
+        type: string
+        description: cell of child
+      village:
+        type: string
+        description: village of child
+
+schemes:
+  - https
+  - http
