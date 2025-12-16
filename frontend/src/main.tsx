@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter as Router } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './css/style.css';
 import './css/satoshi.css';
-import 'jsvectormap/dist/css/jsvectormap.css';
+import 'jsvectormap/dist/jsvectormap.min.css'; // **FIXED PATH**
 import 'flatpickr/dist/flatpickr.min.css';
 import { Provider } from 'react-redux';
 import { persistor, store } from './redux/store';
@@ -13,7 +13,7 @@ import { Toaster } from 'react-hot-toast';
 
 const AppWithRedux = () => (
   <Provider store={store}>
-    <PersistGate persistor={persistor}>
+    <PersistGate persistor={persistor} loading={null}>
       <App />
       <Toaster
         position="top-center"
@@ -30,8 +30,8 @@ const AppWithRedux = () => (
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <Router>
+    <BrowserRouter> {/* **THE SINGLE REQUIRED ROUTER** */}
       <AppWithRedux />
-    </Router>
+    </BrowserRouter>
   </React.StrictMode>,
 );
