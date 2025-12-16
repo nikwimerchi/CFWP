@@ -1,9 +1,11 @@
+// frontend/src/App.tsx (FINAL CONSOLIDATED VERSION)
+
 import { useEffect, useState, useMemo } from 'react';
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import React from 'react'; // Explicitly import React for React.FC
+import { Route, Routes, useLocation, useNavigate, Navigate } from 'react-router-dom'; 
+import React from 'react';
 
 // =============================================================================
-// MOCK COMPONENTS AND LOGIC (Replacing Redux, Layouts, and Page Imports)
+// MOCK COMPONENTS AND AUTH LOGIC 
 // =============================================================================
 
 interface User {
@@ -12,77 +14,76 @@ interface User {
 }
 
 const useAuth = () => {
+    const [authLoading, setAuthLoading] = useState<boolean>(true);
+    
     const [user, setUser] = useState<User>(() => {
         const storedRole = sessionStorage.getItem('mockUserRole');
         const defaultRole: User['role'] = (storedRole as User['role']) || 'guest';
         return { token: defaultRole === 'guest' ? '' : 'mock-token', role: defaultRole };
     });
     
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setAuthLoading(false);
+        }, 100); 
+        return () => clearTimeout(timer);
+    }, []);
+
     const changeRole = (newRole: User['role']) => {
+        setAuthLoading(true);
         const newUser = { 
             token: newRole === 'guest' ? '' : 'mock-token', 
             role: newRole 
         };
         setUser(newUser);
         sessionStorage.setItem('mockUserRole', newRole);
+        setTimeout(() => setAuthLoading(false), 50); 
     };
 
     const isAuthenticated = user.token.trim() !== '';
 
-    return { user, isAuthenticated, changeRole };
+    return { user, isAuthenticated, changeRole, authLoading };
 };
 
-// Define props for the AuthWrapper component
 interface AuthWrapperProps {
     children: React.ReactNode;
     requiredRole?: User['role'];
     inverse?: boolean;
 }
 
+// === FINAL AUTH WRAPPER (Handles Auth/Role check and redirect) ===
 const AuthWrapper: React.FC<AuthWrapperProps> = ({ children, requiredRole, inverse }) => {
-    const { user, isAuthenticated } = useAuth();
-    const navigate = useNavigate();
-    const location = useLocation();
+    const { user, isAuthenticated, authLoading } = useAuth();
+    const location = useLocation(); 
 
-    useEffect(() => {
+    if (authLoading) {
+        return null; 
+    }
+
+    const isAuthorized = useMemo(() => {
         if (inverse) {
-            // Logic for UnProtectedRoute: redirect authenticated users away from signin/signup
-            if (isAuthenticated) {
-                navigate('/dashboard', { replace: true });
-            }
-        } 
-        else {
-            // Logic for ProtectedRoutes: redirect unauthenticated users to signin
-            if (!isAuthenticated) {
-                navigate('/signin', { replace: true });
-            }
-
-            // Logic for Role-ProtectedRoutes: redirect users with incorrect role
-            if (isAuthenticated && requiredRole && user.role !== requiredRole) {
-                navigate('/dashboard', { replace: true });
-            }
+            return !isAuthenticated;
         }
-    }, [isAuthenticated, requiredRole, user.role, navigate, inverse, location.pathname]);
-
-    // Render logic to prevent flashes of unauthorized content
-    if (inverse && isAuthenticated) return null;
-    if (!inverse && !isAuthenticated) return null;
-    if (requiredRole && user.role !== requiredRole) return null;
-
+        if (!isAuthenticated) {
+            return false;
+        }
+        // If requiredRole is specified, check for role match
+        if (requiredRole && user.role !== requiredRole) {
+            return false;
+        }
+        return true;
+    }, [isAuthenticated, requiredRole, user.role, inverse]);
+    
+    if (!isAuthorized) {
+        // Redirect based on authentication status
+        const redirectPath = isAuthenticated ? '/dashboard' : '/signin';
+        return <Navigate to={redirectPath} state={{ from: location }} replace />;
+    }
+    
     return <>{children}</>;
 };
+// ==========================================================
 
-// The following components were missing the children prop type in their definition, 
-// causing the TypeScript error. We now use React.FC which implicitly includes children 
-// in the function component definition, or we can define props explicitly.
-// Using explicit prop types for clarity:
-const UnProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => <AuthWrapper inverse={true}>{children}</AuthWrapper>;
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => <AuthWrapper>{children}</AuthWrapper>;
-const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => <AuthWrapper requiredRole='admin'>{children}</AuthWrapper>;
-const ParentProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => <AuthWrapper requiredRole='parent'>{children}</AuthWrapper>;
-const AdvisorProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => <AuthWrapper requiredRole='advisor'>{children}</AuthWrapper>;
-
-// Standardized Loader type
 const Loader: React.FC<{}> = () => (
     <div className="flex justify-center items-center h-screen text-2xl font-bold text-indigo-600 bg-gray-50">
         Loading Application...
@@ -96,7 +97,6 @@ const PageTitle: React.FC<{ title: string }> = ({ title }) => {
     return null;
 };
 
-// RoleSwitcher already uses React.FC<{}> from the previous fix
 const RoleSwitcher: React.FC<{}> = () => {
     const { user, changeRole } = useAuth();
     const navigate = useNavigate();
@@ -146,19 +146,18 @@ const DefaultLayout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     </div>
 );
 
+// --- Mock Pages (Unchanged) ---
 const MockPage: React.FC<{ name: string; role?: string }> = ({ name, role }) => (
     <div className="p-6 bg-white rounded-xl shadow-2xl m-4 border-l-4 border-indigo-500">
         <div className="flex justify-between items-center">
-             <h2 className="text-2xl font-bold text-gray-800">{name}</h2>
-             {role && <span className={`px-4 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800`}>Role Check: {role}</span>}
+            <h2 className="text-2xl font-bold text-gray-800">{name}</h2>
+            {role && <span className={`px-4 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800`}>Role Check: {role}</span>}
         </div>
         <p className="text-gray-600 mt-3">
             This is a mock component. The complex routing logic is correctly implemented, and you have reached the intended page content.
         </p>
     </div>
 );
-
-// Standardized Mock Page component types to React.FC<{}>
 const SignIn: React.FC<{}> = () => <MockPage name="Sign In" />;
 const SignUp: React.FC<{}> = () => <MockPage name="Sign Up" />;
 const SuccessVerification: React.FC<{}> = () => <MockPage name="Success Verification" />;
@@ -210,40 +209,35 @@ function AppContent() {
   const [loading, setLoading] = useState<boolean>(true);
   const { pathname } = useLocation();
 
-  // Conditionally create the route elements based on user role
-  const adminRoutes = useMemo(() => user.role === 'admin' ? (
-      <Route element={<AdminProtectedRoute children={undefined} />}>
-          <Route path="/parents" element={<DefaultLayout><PageTitle title="Parents" /><AdminPages.ParentsList /></DefaultLayout>} />
-          <Route path="/advisors/list" element={<DefaultLayout><PageTitle title="Advisors" /><AdminPages.AdvisorsList /></DefaultLayout>} />
-          <Route path="/children/:id" element={<DefaultLayout><PageTitle title="Child health statistics" /><AdminPages.ChildStatistics /></DefaultLayout>} />
-          <Route path="/advisors/new" element={<DefaultLayout><PageTitle title="New advisor" /><AdminPages.RegisterNewAdvisor /></DefaultLayout>} />
-          <Route path="/notifications" element={<DefaultLayout><PageTitle title="Notifications" /><AdminPages.Notifications /></DefaultLayout>} />
-          <Route path="/measurements" element={<DefaultLayout><PageTitle title="Measurements" /><AdminPages.Measurements /></DefaultLayout>} />
-          <Route path="/children/edit/:id" element={<DefaultLayout><PageTitle title="Edit Child" /><AdminPages.EditChild /></DefaultLayout>} />
-      </Route>
-  ) : null, [user.role]);
+  // Helper function to define a Protected Route with Layout and Auth 
+  const wrapProtected = (
+    Component: React.FC<any>, 
+    title: string, 
+    requiredRole?: User['role']
+  ) => {
+    return (
+      <AuthWrapper requiredRole={requiredRole}>
+        <DefaultLayout>
+          <PageTitle title={title} />
+          <Component />
+        </DefaultLayout>
+      </AuthWrapper>
+    );
+  };
+    
+  // Helper function for Unprotected Routes (No Layout)
+  const wrapUnprotected = (
+    Component: React.FC<any>, 
+    title: string
+  ) => {
+    return (
+      <AuthWrapper inverse={true}>
+        <PageTitle title={title} />
+        <Component />
+      </AuthWrapper>
+    );
+  };
 
-  const parentRoutes = useMemo(() => user.role === 'parent' ? (
-      <Route element={<ParentProtectedRoute children={undefined} />}>
-          <Route path="/children/list" element={<DefaultLayout><PageTitle title="Children list" /><ParentPages.ChildrenList /></DefaultLayout>} />
-          <Route path="/children/list/:id" element={<DefaultLayout><PageTitle title="Child health statistics" /><ParentPages.ChildStatistics /></DefaultLayout>} />
-          <Route path="/children/new" element={<DefaultLayout><PageTitle title="Register New Child" /><ParentPages.RegisterNewChild /></DefaultLayout>} />
-          <Route path="/chat/:id" element={<DefaultLayout><PageTitle title="Chat with our AI" /><ParentPages.Chat /></DefaultLayout>} />
-          <Route path="/notifications" element={<DefaultLayout><PageTitle title="Notifications" /><ParentPages.Notifications /></DefaultLayout>} />
-          <Route path="/measurements" element={<DefaultLayout><PageTitle title="Measurements Reference List" /><ParentPages.Measurements /></DefaultLayout>} />
-      </Route>
-  ) : null, [user.role]);
-
-  const advisorRoutes = useMemo(() => user.role === 'advisor' ? (
-      <Route element={<AdvisorProtectedRoute children={undefined} />}>
-          <Route path="/children/list" element={<DefaultLayout><PageTitle title="Children list" /><AdvisorPages.ChildrenList /></DefaultLayout>} />
-          <Route path="/children/list/:id" element={<DefaultLayout><PageTitle title="Child health statistics" /><AdvisorPages.ChildStatistics /></DefaultLayout>} />
-          <Route path="/children/new" element={<DefaultLayout><PageTitle title="Register New Child" /><AdvisorPages.RegisterNewChild /></DefaultLayout>} />
-          <Route path="/notifications" element={<DefaultLayout><PageTitle title="Notifications" /><AdvisorPages.Notifications /></DefaultLayout>} />
-          <Route path="/parents" element={<DefaultLayout><PageTitle title="Parents List" /><AdvisorPages.Parents /></DefaultLayout>} />
-          <Route path="/measurements" element={<DefaultLayout><PageTitle title="Measurements Reference" /><AdvisorPages.Measurements /></DefaultLayout>} />
-      </Route>
-  ) : null, [user.role]);
 
   useEffect(() => {
     if (!loading) {
@@ -262,33 +256,49 @@ function AppContent() {
   return (
     <Routes>
       {/* Public/Unprotected Routes */}
-      <Route path="/" element={<UnProtectedRoute><PageTitle title="Signin" /><SignIn /></UnProtectedRoute>} />
-      <Route path="/signin" element={<UnProtectedRoute><PageTitle title="Signin" /><SignIn /></UnProtectedRoute>} />
-      <Route path="/signup" element={<UnProtectedRoute><PageTitle title="Signup" /><SignUp /></UnProtectedRoute>} />
-      <Route path="/verify/success" element={<UnProtectedRoute><SuccessVerification /></UnProtectedRoute>} />
+      <Route path="/" element={wrapUnprotected(SignIn, "Signin")} />
+      <Route path="/signin" element={wrapUnprotected(SignIn, "Signin")} />
+      <Route path="/signup" element={wrapUnprotected(SignUp, "Signup")} />
+      <Route path="/verify/success" element={wrapUnprotected(SuccessVerification, "Verified")} />
       
       {/* Core Protected Routes (Accessible by all logged-in roles) */}
-      <Route path="/dashboard" element={<ProtectedRoute><DefaultLayout><PageTitle title="Dashboard" /><ECommerce /></DefaultLayout></ProtectedRoute>} />
-      <Route path="/calendar" element={<ProtectedRoute><DefaultLayout><PageTitle title="Calendar" /><Calendar /></DefaultLayout></ProtectedRoute>} />
-      <Route path="/profile" element={<ProtectedRoute><DefaultLayout><PageTitle title="Profile" /><Profile /></DefaultLayout></ProtectedRoute>} />
-      <Route path="/forms/form-elements" element={<ProtectedRoute><DefaultLayout><PageTitle title="Form Elements" /><FormElements /></DefaultLayout></ProtectedRoute>} />
-      <Route path="/forms/form-layout" element={<ProtectedRoute><DefaultLayout><PageTitle title="Form Layout" /><FormLayout /></DefaultLayout></ProtectedRoute>} />
-      <Route path="/tables" element={<ProtectedRoute><DefaultLayout><PageTitle title="Tables" /><Tables /></DefaultLayout></ProtectedRoute>} />
-      <Route path="/chart" element={<ProtectedRoute><DefaultLayout><PageTitle title="Basic Chart" /><Chart /></DefaultLayout></ProtectedRoute>} />
-      <Route path="/ui/alerts" element={<ProtectedRoute><DefaultLayout><PageTitle title="Alerts" /><Alerts /></DefaultLayout></ProtectedRoute>} />
-      <Route path="/ui/buttons" element={<ProtectedRoute><DefaultLayout><PageTitle title="Buttons" /><Buttons /></DefaultLayout></ProtectedRoute>} />
+      <Route path="/dashboard" element={wrapProtected(ECommerce, "Dashboard")} />
+      <Route path="/calendar" element={wrapProtected(Calendar, "Calendar")} />
+      <Route path="/profile" element={wrapProtected(Profile, "Profile")} />
+      <Route path="/forms/form-elements" element={wrapProtected(FormElements, "Form Elements")} />
+      <Route path="/forms/form-layout" element={wrapProtected(FormLayout, "Form Layout")} />
+      <Route path="/tables" element={wrapProtected(Tables, "Tables")} />
+      <Route path="/chart" element={wrapProtected(Chart, "Basic Chart")} />
+      <Route path="/ui/alerts" element={wrapProtected(Alerts, "Alerts")} />
+      <Route path="/ui/buttons" element={wrapProtected(Buttons, "Buttons")} />
 
-      {/* Admin routes (Conditionally rendered) */}
-      {adminRoutes}
+      {/* Admin routes */}
+      <Route path="/parents" element={wrapProtected(AdminPages.ParentsList, "Parents List", 'admin')} />
+      <Route path="/advisors/list" element={wrapProtected(AdminPages.AdvisorsList, "Advisors List", 'admin')} />
+      <Route path="/children/:id" element={wrapProtected(AdminPages.ChildStatistics, "Child Statistics", 'admin')} />
+      <Route path="/advisors/new" element={wrapProtected(AdminPages.RegisterNewAdvisor, "New Advisor", 'admin')} />
+      <Route path="/notifications" element={wrapProtected(AdminPages.Notifications, "Notifications", 'admin')} />
+      <Route path="/measurements" element={wrapProtected(AdminPages.Measurements, "Measurements", 'admin')} />
+      <Route path="/children/edit/:id" element={wrapProtected(AdminPages.EditChild, "Edit Child", 'admin')} />
 
-      {/* Parent routes (Conditionally rendered) */}
-      {parentRoutes}
+      {/* Parent routes */}
+      <Route path="/children/list" element={wrapProtected(ParentPages.ChildrenList, "Children List", 'parent')} />
+      <Route path="/children/list/:id" element={wrapProtected(ParentPages.ChildStatistics, "Child Stats", 'parent')} />
+      <Route path="/children/new" element={wrapProtected(ParentPages.RegisterNewChild, "Register Child", 'parent')} />
+      <Route path="/chat/:id" element={wrapProtected(ParentPages.Chat, "AI Chat", 'parent')} />
+      <Route path="/notifications" element={wrapProtected(ParentPages.Notifications, "Notifications", 'parent')} />
+      <Route path="/measurements" element={wrapProtected(ParentPages.Measurements, "Measurements Ref", 'parent')} />
 
-      {/* Advisors routes (Conditionally rendered) */}
-      {advisorRoutes}
+      {/* Advisors routes */}
+      <Route path="/children/list" element={wrapProtected(AdvisorPages.ChildrenList, "Children List", 'advisor')} />
+      <Route path="/children/list/:id" element={wrapProtected(AdvisorPages.ChildStatistics, "Child Stats", 'advisor')} />
+      <Route path="/children/new" element={wrapProtected(AdvisorPages.RegisterNewChild, "Register Child", 'advisor')} />
+      <Route path="/notifications" element={wrapProtected(AdvisorPages.Notifications, "Notifications", 'advisor')} />
+      <Route path="/parents" element={wrapProtected(AdvisorPages.Parents, "Parents List", 'advisor')} />
+      <Route path="/measurements" element={wrapProtected(AdvisorPages.Measurements, "Measurements Ref", 'advisor')} />
 
       {/* Not Found Route (Protected) */}
-      <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
+      <Route path="*" element={wrapProtected(NotFound, "404", user.role)} /> 
     </Routes>
   );
 }
@@ -298,10 +308,9 @@ function AppContent() {
 // =============================================================================
 
 function App() {
-  // **FIXED: Removed the duplicate <BrowserRouter>**
-  return (
-    <AppContent />
-  );
+    return (
+        <AppContent />
+    );
 }
 
 export default App;
