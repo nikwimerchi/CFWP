@@ -1,8 +1,11 @@
 import { Request } from "express";
-import { IUser } from "./users.interface";
-
+import { User } from "../models/users.model"; // FIX: Point to the new User model
+export interface RequestWithUser extends Request {
+  user: User;
+}
 export interface DataStoredInToken {
-  _id: string;
+  id: string;   // Supabase UUID
+  _id?: string; // Optional fallback for old Mongoose tokens
 }
 
 export interface TokenData {
@@ -11,5 +14,5 @@ export interface TokenData {
 }
 
 export interface RequestWithUser extends Request {
-  user: IUser;
+  user: User; // FIX: Use the new User interface
 }

@@ -23,6 +23,7 @@
     }
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
@@ -38,20 +39,19 @@
     "http-status": "^1.7.4",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^7.0.0",
-    "mongoose": "^8.3.1",
     "morgan": "^1.10.0",
     "nodemailer": "^7.0.11",
     "openai": "^4.47.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
-    "winston": "^3.13.0"
+    "winston": "^3.13.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/mongoose": "^5.11.97",
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.12.5",
     "@types/swagger-jsdoc": "^6.0.4",

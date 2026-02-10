@@ -1,21 +1,18 @@
 import { NextFunction, Request, Response } from "express";
 import { CreateUserDto, LoginDto } from "../dtos/users.dto";
-import { IUser } from "../interfaces/users.interface";
+import { User } from "../models/users.model"; 
 import { login, logout, signup, verifyEmail } from "../services/auth.service";
 import { RequestWithUser } from "../interfaces/auth.interface";
-import { FRONTEND_PUBLIC_URL } from "../config";
+import { FRONTEND_PUBLIC_URL } from "../config"; 
 
 export async function signUp(req: Request, res: Response, next: NextFunction) {
   try {
     const userData: CreateUserDto = req.body;
-    const signUpUserData: IUser = await signup(userData);
+    const signUpUserData: User = await signup(userData);
 
     res.status(201).json({
       data: signUpUserData,
-      message:
-        "Email verification instructions has been sent to " +
-        signUpUserData.email +
-        ". Please check your inbox.",
+      message: `Email verification instructions have been sent to ${signUpUserData.email}. Please check your inbox.`,
     });
   } catch (error) {
     next(error);
@@ -42,7 +39,10 @@ export async function verifyUserEmail(
   try {
     const { verificationToken } = req.params;
     await verifyEmail(verificationToken);
-    res.redirect(FRONTEND_PUBLIC_URL + "/verify/success");
+    
+    // Fallback if FRONTEND_PUBLIC_URL is undefined during migration
+    const redirectUrl = FRONTEND_PUBLIC_URL || 'http://localhost:3000';
+    res.redirect(`${redirectUrl}/verify/success`);
   } catch (error) {
     next(error);
   }
@@ -54,11 +54,14 @@ export async function logOut(
   next: NextFunction
 ) {
   try {
-    const userData: IUser = req.user;
-    const logOutUserData: IUser = await logout(userData);
+    const userData: User = req.user;
+    
+    // FIX: Just await the logout. Most auth services return void on logout.
+    // If your service returns the user, keep it; if it returns void, remove the assignment.
+    await logout(userData); 
 
-    res.setHeader("Set-Cookie", ["Authorization=; Max-age=0"]);
-    res.status(200).json({ data: logOutUserData, message: "logout" });
+    res.setHeader("Set-Cookie", ["Authorization=; Max-age=0; Path=/; HttpOnly"]);
+    res.status(200).json({ message: "logout" });
   } catch (error) {
     next(error);
   }

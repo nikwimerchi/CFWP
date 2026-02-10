@@ -1,86 +1,126 @@
 import httpStatus from "http-status";
+import OpenAI from "openai";
+import { supabase } from "../db";
 import { HttpException } from "../exceptions/HttpException";
 import { calculateYearsAndMonths, isEmpty } from "../utils/util";
-import { ChatDto } from "../dtos/chat.dto";
-import { IUser } from "../interfaces/users.interface";
-import { IChild } from "../interfaces/child.interface";
-import childModel from "../models/child.model";
-import OpenAI from "openai";
-import chatModel from "../models/chat.models";
-import { IChat } from "../interfaces/chat.interface";
-import childHealthDataModel from "../models/childHealthData.model";
+import { ChatDto } from "../dtos/chat.dto"; // Corrected path/name
+import { User } from "../models/users.model"; 
+import { Chat } from "../models/chat"; // Use correct filename casing if your file is 'chat.ts'
 
-export const chatt = async (data: ChatDto, user: IUser): Promise<IChat> => {
-  if (isEmpty(data))
-    throw new HttpException(httpStatus.BAD_REQUEST, "Invalid data");
 
-  const child: IChild = await childModel.findOne({
-    _id: data.childId,
-    parentId: user._id,
-    status: "approved",
-  });
-  if (!child) {
+const openai = new OpenAI({
+  apiKey: process.env.OPEN_API_SECRET_KEY,
+  organization: process.env.OPEN_API_ORGANIZATION_ID,
+});
+
+/**
+ * Handle AI Chat regarding child health
+ */
+export const chatt = async (data: ChatDto, user: User): Promise<Chat> => {
+  if (isEmpty(data)) throw new HttpException(httpStatus.BAD_REQUEST, "Invalid data");
+
+  // 1. Verify Child Ownership (Note: Supabase uses snake_case in columns)
+  const { data: child, error: childError } = await supabase
+    .from('children')
+    .select('*')
+    .eq('id', data.childId)
+    .eq('parent_id', user.id) // FIX: parent_id vs parentId
+    .eq('status', 'approved')
+    .single();
+
+  if (childError || !child) {
+    throw new HttpException(httpStatus.BAD_REQUEST, `Invalid child or unauthorized access.`);
+  }
+
+  const { months, years } = calculateYearsAndMonths(child.date_of_birth); // FIX: date_of_birth
+
+  // 2. Fetch Health Data for context
+  const { data: healthData, error: healthError } = await supabase
+    .from('child_health_data')
+    .select('*')
+    .eq('child_id', data.childId); // FIX: child_id
+
+  if (healthError || !healthData || healthData.length === 0) {
     throw new HttpException(
       httpStatus.BAD_REQUEST,
-      `Invalid child please try again with correct info`
+      `Health info unavailable. Please wait for an advisor to update records.`
     );
   }
-  const { months, years } = calculateYearsAndMonths(child.dateOfBirth);
-
-  const healthData = await childHealthDataModel.find({ childId: data.childId });
-  if (healthData.length === 0)
-    throw new HttpException(
-      httpStatus.BAD_REQUEST,
-      `Sorry, we currently don't have any health info for our AI Model to use, Please wait patiently for advisor to let us know health info of this child.`
-    );
 
   try {
-    const openai = new OpenAI({
-      organization: process.env.OPEN_API_ORGANIZATION_ID,
-      apiKey: process.env.OPEN_API_SECRET_KEY,
-    });
-
-    const generalInfo = `My kid's name is ${child.firstName}. He is ${years} years and ${months} old. NB: this conversation must focus on health advice otherwise reply by warning me. My question is:  ${data.content}`;
+    // 3. Construct AI Prompt with recent health context
+    const recentHealth = healthData[healthData.length - 1];
+    const generalInfo = `My kid's name is ${child.first_name}. Age: ${years}y ${months}m. 
+    Latest health stats: Height ${recentHealth.height}cm, Weight ${recentHealth.weight}kg.
+    User Question: ${data.content}`;
 
     const completion = await openai.chat.completions.create({
-      messages: [{ role: "user", content: generalInfo }],
+      messages: [
+        { role: "system", content: "You are a helpful pediatric health assistant. Only provide health advice." },
+        { role: "user", content: generalInfo }
+      ],
       model: "gpt-3.5-turbo",
     });
 
-    if (completion?.choices) {
-      const response = completion.choices[0].message;
-      await chatModel.create({
-        ...data,
-        role: "user",
-        userId: user._id,
-      });
+    const aiResponse = completion.choices[0]?.message?.content;
 
-      const chatt: IChat = await chatModel.create({
-        ...data,
-        role: "assistant",
-        userId: user._id,
-        content: response.content,
-      });
-      return chatt;
+    if (aiResponse) {
+      // 4. Save to Supabase (Mapping camelCase DTO to snake_case DB)
+      const chatEntries = [
+        { 
+          child_id: data.childId, 
+          content: data.content, 
+          role: "user", 
+          user_id: user.id 
+        },
+        { 
+          child_id: data.childId, 
+          content: aiResponse, 
+          role: "assistant", 
+          user_id: user.id 
+        }
+      ];
+
+      const { data: savedChats, error: saveError } = await supabase
+        .from('chats')
+        .insert(chatEntries)
+        .select();
+
+      if (saveError) throw new HttpException(500, "Failed to save chat history.");
+
+      // Return Assistant message mapped back to camelCase
+      const lastChat = savedChats[1];
+      return {
+        ...lastChat,
+        childId: lastChat.child_id,
+        userId: lastChat.user_id
+      } as Chat;
     } else {
-      throw new HttpException(
-        httpStatus.BAD_REQUEST,
-        "Could not be able to communicate with our AI model, please try again later."
-      );
+      throw new HttpException(httpStatus.BAD_REQUEST, "AI failed to generate response.");
     }
   } catch (error) {
-    throw new HttpException(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      "Something went wrong while communicating with our AI model. " +
-        (error.message || JSON.stringify(error))
-    );
+    throw new HttpException(httpStatus.INTERNAL_SERVER_ERROR, `AI Service Error: ${error.message}`);
   }
 };
 
-export const getChatts = async (
-  childId: string,
-  user: IUser
-): Promise<IChat[]> => {
-  const data = await chatModel.find({ userId: user._id, childId });
-  return data;
+/**
+ * Retrieve Chat History
+ */
+export const getChatts = async (childId: string, user: User): Promise<Chat[]> => {
+  const { data, error } = await supabase
+    .from('chats')
+    .select('*')
+    .eq('user_id', user.id) // FIX: user_id
+    .eq('child_id', childId) // FIX: child_id
+    .order('created_at', { ascending: true });
+
+  if (error) throw new HttpException(500, error.message);
+
+  // Map results back to camelCase for the frontend
+  return data.map(chat => ({
+    ...chat,
+    childId: chat.child_id,
+    userId: chat.user_id,
+    createdAt: chat.created_at
+  })) as Chat[];
 };

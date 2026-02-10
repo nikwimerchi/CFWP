@@ -1,139 +1,124 @@
-// backend/src/services/auth.service.ts
-
-import userModel, { UserDocument } from '../models/users.model'; // Import your Mongoose model
-import { IUser } from '../interfaces/users.interface';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import { supabase } from '../db';
+// FIX: Use the new User model
+import { User } from '../models/users.model'; 
 import { CreateUserDto, LoginDto } from '../dtos/users.dto';
-import { HttpException } from '../exceptions/HttpException'; // Assume you have this custom exception class
-import crypto from 'crypto'; // For generating secure verification tokens
-import bcrypt from 'bcryptjs'; // For password comparison in login
-import jwt from 'jsonwebtoken'; // For generating JWT tokens
-
-// Assuming you have an email service utility:
-// import { sendVerificationEmail } from '../utils/emailService'; 
+import { HttpException } from '../exceptions/HttpException';
+// Use SECRET_KEY or JWT_SECRET depending on your config export
+import { SECRET_KEY } from '../config'; 
 
 // =========================================================================
 // 1. SIGNUP SERVICE
 // =========================================================================
+export async function signup(userData: CreateUserDto): Promise<User> {
+  // 1. Check for duplicates using Supabase column names (snake_case)
+  const { data: existingUser } = await supabase
+    .from('users')
+    .select('email, phone_number')
+    .or(`email.eq.${userData.email},phone_number.eq.${userData.phoneNumber}`)
+    .maybeSingle(); // maybeSingle() is safer than single() for lookups
 
-export async function signup(userData: CreateUserDto): Promise<IUser> {
-    
-    // 1. Check for duplicates
-    const findUserByEmail = await userModel.findOne({ email: userData.email });
-    if (findUserByEmail) {
-        throw new HttpException(409, `User with email ${userData.email} already exists.`);
-    }
+  if (existingUser) {
+    const field = existingUser.email === userData.email ? 'email' : 'phone number';
+    throw new HttpException(409, `User with this ${field} already exists.`);
+  }
 
-    const findUserByPhone = await userModel.findOne({ phoneNumber: userData.phoneNumber });
-    if (findUserByPhone) {
-        throw new HttpException(409, `User with phone number ${userData.phoneNumber} already exists.`);
-    }
+  // 2. Security: Hash password & Generate verification token
+  const hashedPassword = await bcrypt.hash(userData.password, 10);
+  const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    // 2. Generate the unique verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex'); 
+  // 3. Create payload mapped to DB columns (snake_case)
+  const dbPayload = {
+    names: userData.names,
+    email: userData.email,
+    password: hashedPassword,
+    phone_number: userData.phoneNumber,
+    address: userData.address,
+    role: userData.role || 'parent',
+    verification_token: verificationToken,
+    is_email_verified: false,
+    is_verified: false
+  };
 
-    // 3. Create the new user payload (password hashing is done by the Mongoose pre-save hook)
-    const newUserPayload = { 
-        ...userData, 
-        verificationToken: verificationToken, // Save the token
-        isEmailVerified: false, 
-        role: userData.role || 'parent' // Ensure a default role if not provided
-    };
-    
-    const createdUser: UserDocument = await userModel.create(newUserPayload); 
+  // 4. Insert into Supabase
+  const { data: createdUser, error } = await supabase
+    .from('users')
+    .insert([dbPayload])
+    .select()
+    .single();
 
-    // 4. (TODO) Send the verification email (Implement this utility separately)
-    // await sendVerificationEmail(createdUser.email, verificationToken); 
+  if (error) throw new HttpException(500, error.message);
 
-    // Return the user object without sensitive data
-    const userResponse: IUser = createdUser.toObject();
-    delete userResponse.password; 
-    delete userResponse.verificationToken;
-
-    return userResponse;
+  // Return formatted User (excluding sensitive fields)
+  const { password, verification_token, ...userResponse } = createdUser;
+  return userResponse as unknown as User;
 }
 
 // =========================================================================
 // 2. LOGIN SERVICE
 // =========================================================================
+export async function login(userData: LoginDto): Promise<{ cookie: string; findUser: User; token: string }> {
+  // 1. Find the user
+  const { data: findUser, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('email', userData.email)
+    .single();
 
-export async function login(userData: LoginDto): Promise<{ cookie: string; findUser: IUser; token: string }> {
-    
-    // 1. Find the user
-    const findUser: UserDocument | null = await userModel.findOne({ email: userData.email });
-    if (!findUser) {
-        throw new HttpException(401, 'Invalid credentials.');
-    }
+  if (error || !findUser) {
+    throw new HttpException(401, 'Invalid credentials.');
+  }
 
-    // 2. Compare the password hash
-    const isPasswordMatching = await bcrypt.compare(userData.password, findUser.password);
-    if (!isPasswordMatching) {
-        throw new HttpException(401, 'Invalid credentials.');
-    }
-    
-    // 3. SECURITY CHECK: Ensure email is verified
-    if (!findUser.isEmailVerified) {
-         throw new HttpException(403, 'Email not verified. Please check your inbox for the verification link.');
-    }
+  // 2. Compare password
+  const isPasswordMatching = await bcrypt.compare(userData.password, findUser.password);
+  if (!isPasswordMatching) {
+    throw new HttpException(401, 'Invalid credentials.');
+  }
 
-    // 4. Generate JWT
-    const tokenData = {
-        _id: findUser._id,
-        email: findUser.email,
-        role: findUser.role,
-    };
-    
-    const secret = process.env.JWT_SECRET || 'YOUR_FALLBACK_SECRET_MUST_BE_SECURE'; 
-    const token = jwt.sign(tokenData, secret, { expiresIn: '1d' });
+  // 3. Check verification status (using DB column name)
+  if (!findUser.is_email_verified) {
+    throw new HttpException(403, 'Email not verified.');
+  }
 
-    // 5. Generate Cookie (Replace with your actual cookie generation logic)
-    const cookie = `Authorization=${token}; HttpOnly; Max-Age=${60 * 60 * 24}; Path=/`; // 1 day expiry
+  // 4. Generate JWT
+  const tokenData = { id: findUser.id, email: findUser.email, role: findUser.role };
+  const token = jwt.sign(tokenData, SECRET_KEY, { expiresIn: '1d' });
 
-    // 6. Prepare user response (remove password hash)
-    const userResponse: IUser = findUser.toObject();
-    delete userResponse.password; 
-    delete userResponse.verificationToken;
+  // 5. Generate Cookie
+  const cookie = `Authorization=${token}; HttpOnly; Max-Age=${60 * 60 * 24}; Path=/`;
 
-    return { cookie, findUser: userResponse, token };
+  const { password, verification_token, ...userResponse } = findUser;
+  return { cookie, findUser: userResponse as unknown as User, token };
 }
 
 // =========================================================================
 // 3. VERIFY EMAIL SERVICE
 // =========================================================================
-
 export async function verifyEmail(verificationToken: string): Promise<void> {
-    
-    // 1. Find the user by the token
-    const findUser: UserDocument | null = await userModel.findOne({ verificationToken });
+  const { data: findUser, error } = await supabase
+    .from('users')
+    .update({ is_email_verified: true, verification_token: null })
+    .eq('verification_token', verificationToken)
+    .select()
+    .single();
 
-    if (!findUser) {
-        throw new HttpException(404, 'Verification link is invalid or has expired.');
-    }
-
-    // 2. Update the user document
-    findUser.isEmailVerified = true;
-    findUser.verificationToken = undefined; // Clear the used token for security
-
-    // 3. Save the updated document to MongoDB
-    await findUser.save();
+  if (error || !findUser) {
+    throw new HttpException(404, 'Verification link is invalid or has expired.');
+  }
 }
 
 // =========================================================================
-// 4. LOGOUT SERVICE (Simple token clearing)
+// 4. LOGOUT SERVICE
 // =========================================================================
+export async function logout(userData: User): Promise<void> {
+  // Check if user exists in DB
+  const { data: findUser, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', userData.id)
+    .single();
 
-export async function logout(userData: IUser): Promise<IUser> {
-    // In a stateless JWT system, logout is often handled client-side by deleting the token.
-    // If you use a blacklist/revocation list on the server, that logic would go here.
-    
-    const findUser: UserDocument | null = await userModel.findById(userData._id);
-    if (!findUser) {
-        throw new HttpException(404, 'User not found');
-    }
-
-    // Prepare response
-    const userResponse: IUser = findUser.toObject();
-    delete userResponse.password; 
-    delete userResponse.verificationToken;
-
-    return userResponse;
+  if (error || !findUser) throw new HttpException(404, 'User not found');
 }

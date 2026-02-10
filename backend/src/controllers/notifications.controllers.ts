@@ -17,8 +17,9 @@ export const notifyPeople = async (req: RequestWithUser, res: Response) => {
 
 export const getNotifications = async (req: RequestWithUser, res: Response) => {
   try {
+    // FIX: Using .id instead of ._id for Supabase/PostgreSQL
     const notifications = await notificationService.getNotifications(
-      req.user._id
+      req.user.id
     );
     return res.status(httpStatus.OK).json({ notifications });
   } catch (error) {
@@ -31,10 +32,11 @@ export const readAllNotifications = async (
   res: Response
 ) => {
   try {
-    await notificationService.readAllNotifications(req.user._id);
+    // FIX: Using .id instead of ._id
+    await notificationService.readAllNotifications(req.user.id);
     return res
       .status(httpStatus.OK)
-      .json({ messaage: "All notifications are marked as read" });
+      .json({ message: "All notifications are marked as read" }); // Fixed typo 'messaage'
   } catch (error) {
     return res.status(httpStatus.BAD_REQUEST).json({ message: error.message });
   }
@@ -46,10 +48,11 @@ export const deleteNotification = async (
 ) => {
   try {
     const { id } = req.params;
-    await notificationService.deleteNotification(id, req.user._id);
+    // FIX: Using .id instead of ._id
+    await notificationService.deleteNotification(id, req.user.id);
     return res
       .status(httpStatus.OK)
-      .json({ messaage: "Notification deleted successfull" });
+      .json({ message: "Notification deleted successfully" }); // Fixed typo 'messaage'
   } catch (error) {
     return res.status(httpStatus.BAD_REQUEST).json({ message: error.message });
   }

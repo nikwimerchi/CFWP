@@ -1,392 +1,180 @@
-swagger: "2.0"
+openapi: 3.0.0
 info:
-  title: "Your API"
+  title: "Children Welfare Portal API"
   version: "1.0.0"
-securityDefinitions:
-  BearerAuth:
-    type: apiKey
-    name: Authorization
-    in: header
-    description: Bearer authentication token
+  description: "Comprehensive API Documentation for the Supabase-backed health monitoring system."
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Development Server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # --- Shared Schemas ---
+    address:
+      type: object
+      properties:
+        province: { type: string }
+        district: { type: string }
+        sector: { type: string }
+        cell: { type: string }
+        village: { type: string }
+
+    # --- Auth Schemas ---
+    loginData:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+
+    signupData:
+      type: object
+      required: [names, email, password, address, role]
+      properties:
+        names: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        role: { type: string, enum: [parent, advisor, admin] }
+        address: { $ref: '#/components/schemas/address' }
+
+    # --- Business Logic Schemas ---
+    child:
+      type: object
+      required: [firstName, lastName, dateOfBirth, parentId]
+      properties:
+        id: { type: string, format: uuid }
+        firstName: { type: string }
+        lastName: { type: string }
+        dateOfBirth: { type: string, format: date }
+        parentId: { type: string, format: uuid }
+        address: { $ref: '#/components/schemas/address' }
+
+    healthData:
+      type: object
+      required: [childId, weight, height, width]
+      properties:
+        childId: { type: string, format: uuid }
+        weight: { type: number, example: 12.5 }
+        height: { type: number, example: 85.0 }
+        width: { type: number, description: "MUAC measurement", example: 13.5 }
 
 tags:
-  - name: Child health care portal
-    description: API Documentation
+  - name: Authentication
+  - name: Child Management
+  - name: Health Records
+  - name: Advisors
+  - name: Measurements
 
 paths:
-  # [POST] login
-  /api/v1/auth/login:
+  # --- AUTH ---
+  /auth/signup:
     post:
-      tags:
-        - Authentication
-      summary: Login
-      parameters:
-        - name: body
-          in: body
-          description: login Data
-          required: true
-          schema:
-            $ref: "#/definitions/loginData"
+      tags: [Authentication]
+      summary: Register a new account
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/signupData' }
       responses:
-        201:
-          description: "Logged in"
-        400:
-          description: "Bad Request"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
+        201: { description: "User created" }
 
-  # [POST] signup
-  /api/v1/auth/signup:
+  /auth/login:
     post:
-      tags:
-        - Authentication
-      summary: User Signup
-      parameters:
-        - name: body
-          in: body
-          description: Signup Data
-          required: true
-          schema:
-            $ref: "#/definitions/signupData"
+      tags: [Authentication]
+      summary: Authenticate user
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/loginData' }
       responses:
-        201:
-          description: "User account created"
-        400:
-          description: "Bad Request"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
+        200: { description: "Token returned" }
 
-    # [POST] signup
-
-  # [POST] logout
-  /api/v1/auth/logout:
-    post:
-      tags:
-        - Authentication
-      summary: Logout
-      responses:
-        201:
-          description: "User account created"
-        400:
-          description: "Bad Request"
-        401:
-          description: "Unauthorized"
-
-  # [GET] users
-  /api/v1/users:
+  # --- CHILDREN ---
+  /child:
     get:
-      tags:
-        - users
-      summary: Find All Users
+      tags: [Child Management]
+      summary: Fetch children list
+      security: [{ bearerAuth: [] }]
       responses:
-        200:
-          description: "OK"
-        500:
-          description: "Server Error"
-
-    # [POST] users
+        200: { description: "Success" }
     post:
-      tags:
-        - users
-      summary: Add User
-      parameters:
-        - name: body
-          in: body
-          description: user Data
-          required: true
-          schema:
-            $ref: "#/definitions/users"
+      tags: [Child Management]
+      summary: Register a child
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/child' }
       responses:
-        201:
-          description: "Created"
-        400:
-          description: "Bad Request"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
+        201: { description: "Created" }
 
-  # [GET] users/id
-  /api/v1/auth/users/{id}:
+  /child/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
     get:
-      tags:
-        - users
-      summary: Find User By Id
-      parameters:
-        - name: id
-          in: path
-          description: User Id
-          required: true
-      responses:
-        200:
-          description: "OK"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
-
-    # [PUT] users/id
-    put:
-      tags:
-        - users
-      summary: Update User By Id
-      parameters:
-        - name: id
-          in: path
-          description: user Id
-          required: true
-        - name: body
-          in: body
-          description: user Data
-          required: true
-          schema:
-            $ref: "#/definitions/users"
-      responses:
-        200:
-          description: "OK"
-        400:
-          description: "Bad Request"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
-
-    # [DELETE] users/id
+      tags: [Child Management]
+      summary: Get child by UUID
     delete:
-      tags:
-        - users
-      summary: Delete User By Id
-      parameters:
-        - name: id
-          in: path
-          description: user Id
-          required: true
-      responses:
-        200:
-          description: "OK"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
+      tags: [Child Management]
+      summary: Remove child record
+      security: [{ bearerAuth: [] }]
 
-
-# [GET] Child
-  /api/v1/child:
-    get:
-      tags:
-        - child
-      summary: Find All children
-      responses:
-        200:
-          description: "OK"
-        500:
-          description: "Server Error"
-
-    # [POST] child
+  # --- HEALTH DATA ---
+  /healthData:
     post:
-      tags:
-        - child
-      summary: Add Child
-      parameters:
-        - name: Authorization
-          in: header
-          description: Authentication token
-          required: true
-          type: string
-          format: Bearer <token>
-        - name: body
-          in: body
-          description: child Data
-          required: true
-          schema:
-            $ref: "#/definitions/child"
+      tags: [Health Records]
+      summary: Add monthly growth measurements
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/healthData' }
       responses:
-        201:
-          description: "Created"
-        400:
-          description: "Bad Request"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
+        201: { description: "Data saved and condition calculated" }
 
-  # [GET] child/id
-  /api/v1/child/{id}:
+  /healthData/{childId}:
     get:
-      tags:
-        - child
-      summary: Find Child By Id
+      tags: [Health Records]
+      summary: Get growth history for a child
       parameters:
-        - name: id
+        - name: childId
           in: path
-          description: Child Id
           required: true
+          schema: { type: string, format: uuid }
       responses:
-        200:
-          description: "OK"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
+        200: { description: "History retrieved" }
 
-    # [PUT] child/id
-    put:
-      tags:
-        - child
-      summary: Update Child By Id
+  # --- ADVISORS ---
+  /advisors/jurisdiction:
+    get:
+      tags: [Advisors]
+      summary: Find advisors by location
+      security: [{ bearerAuth: [] }]
       parameters:
-        - name: id
-          in: path
-          description: child Id
-          required: true
-        - name: body
-          in: body
-          description: child Data
-          required: true
-          schema:
-            $ref: "#/definitions/child"
+        - name: district
+          in: query
+          schema: { type: string }
       responses:
-        200:
-          description: "OK"
-        400:
-          description: "Bad Request"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
+        200: { description: "OK" }
 
-    # [DELETE] child/id
-    delete:
-      tags:
-        - child
-      summary: Delete Child By Id
-      parameters:
-        - name: id
-          in: path
-          description: child Id
-          required: true
+  # --- MEASUREMENTS ---
+  /measurements:
+    get:
+      tags: [Measurements]
+      summary: Get WHO health standards
+    post:
+      tags: [Measurements]
+      summary: Update standards (Admin)
+      security: [{ bearerAuth: [] }]
       responses:
-        200:
-          description: "OK"
-        409:
-          description: "Conflict"
-        500:
-          description: "Server Error"
-
-# definitions
-definitions:
-  users:
-    type: object
-    required:
-      - email
-      - password
-    properties:
-      email:
-        type: string
-        description: user Email
-      password:
-        type: string
-        description: user Password
-  child:
-    type: object
-    required:
-      - firstName
-      - lastName
-      - age
-      - address
-      - parentId
-      - registeredBy
-    properties:
-      firstName:
-        type: string
-        description: child first name
-      lastName:
-        type: string
-        description: child last name
-      age:
-        type: number
-        description: child age
-      address:
-        $ref: '#/definitions/address'
-      parentId:
-        type: string
-        description: child parentId
-      registeredBy:
-        $ref: '#/definitions/registeredBy'
-  # Login data
-  loginData:
-    type: object
-    required:
-      - email
-      - password
-    properties:
-      email:
-        type: string
-        description: user Email
-      password:
-        type: string
-        description: user Password
-  # signup data
-  signupData:
-    type: object
-    required:
-      - names
-      - email
-      - password
-      - address
-      - role
-
-    properties:
-      names:
-        type: string
-        description: user fullname
-      email:
-        type: string
-        description: user Email
-      password:
-        type: string
-        description: user Password
-      address:
-        type: object
-        description: user full address
-      role:
-        type: string
-        description: user role either parent or advisor
-
-# registered by 
-  registeredBy:
-    type: object
-    properties:
-      userId:
-        type: string
-        description: ID of the user who registered the child
-      role:
-        type: string
-        description: Role of the user who registered the child
-# registered by 
-  address:
-    type: object
-    properties:
-      province:
-        type: string
-        description: privince of child
-      district:
-        type: string
-        description: district of child
-      sector:
-        type: string
-        description: sector of child
-      cell:
-        type: string
-        description: cell of child
-      village:
-        type: string
-        description: village of child
-
-schemes:
-  - https
-  - http
+        201: { description: "Standards updated" }

@@ -6,18 +6,26 @@ import authMiddleware from "../../middlewares/auth.middleware";
 
 const router: Router = express.Router();
 
-// router.get("/", authMiddleware, controller.getUsers);
-
+/**
+ * Update User Password
+ * Logic: Compares current hash and updates with new hashed password in Supabase.
+ */
 router.put(
   "/updatePassword",
   authMiddleware,
   validationMiddleware(ChangePasswordDto, "body"),
   controller.changePassword
 );
+
+/**
+ * Edit User Profile
+ * Logic: Updates general information (names, phoneNumber, address JSONB).
+ */
 router.put(
   "/",
   authMiddleware,
   validationMiddleware(EditUserDto, "body"),
   controller.editUser
 );
+
 export default router;

@@ -1,16 +1,15 @@
-import { Schema, Document, model } from "mongoose";
-import { IChat } from "../interfaces/chat.interface";
+// src/models/chats.model.ts
 
-const chatsSchema: Schema = new Schema(
-  {
-    role: { type: String, required: true, enum: ["user", "assistant"] },
-    content: { type: String, required: true },
-    childId: { type: String, required: true },
-    userId: { type: String, required: true },
-  },
-  { timestamps: true }
-);
+export interface Chat {
+  id?: string;               // UUID from Supabase (optional on create)
+  role: 'user' | 'assistant';
+  content: string;
+  childId: string;           // UUID string
+  userId: string;            // UUID string
+  created_at?: string;       // Supabase default timestamp
+  updated_at?: string;
+}
 
-const chatModel = model<IChat & Document>("Chats", chatsSchema);
-
-export default chatModel;
+// Export a placeholder or type if your services still 
+// look for "chatModel", but ideally, you'll call Supabase directly.
+export type ChatModel = Chat;

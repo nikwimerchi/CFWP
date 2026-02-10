@@ -4,15 +4,19 @@ import {
   IsNotEmpty,
   IsObject,
   IsString,
+  IsOptional,
+  IsBoolean,
   MaxLength,
   MinLength,
 } from "class-validator";
-import { TUserRole } from "../interfaces/users.interface";
+import { TUserRole } from "../models/users.model";
 
 enum roleEnum {
   advisor = "advisor",
   parent = "parent",
+  admin = "admin" // Added admin if needed
 }
+
 export class CreateUserDto {
   @IsEmail()
   public email: string;
@@ -43,6 +47,15 @@ export class CreateUserDto {
     cell: string;
     village: string;
   };
+
+  // FIX TS2339: Added for users.service.ts mapping
+  @IsBoolean()
+  @IsOptional()
+  public isVerified?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  public isEmailVerified?: boolean;
 }
 
 export class CreateAdvisorDto {
@@ -73,13 +86,24 @@ export class LoginDto {
 export class EditUserDto {
   @IsString()
   @IsNotEmpty()
-  public names: string;
+  @IsOptional()
+  public names?: string;
 
   @IsString()
   @IsNotEmpty()
   @MinLength(10)
   @MaxLength(10)
-  public phoneNumber: string;
+  @IsOptional()
+  public phoneNumber?: string;
+
+  // FIX TS2339: Explicitly add isVerified for the service to use
+  @IsBoolean()
+  @IsOptional()
+  public isVerified?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  public isEmailVerified?: boolean;
 }
 
 export class ChangePasswordDto {
