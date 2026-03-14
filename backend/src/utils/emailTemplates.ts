@@ -1,88 +1,70 @@
-import { BACKEND_PUBLIC_URL, FRONTEND_PUBLIC_URL } from "../config";
+import { FRONTEND_PUBLIC_URL } from "../config";
 
+/**
+ * User Email Verification Template
+ */
 export const userEmailVerificationTemplate = (
   names: string,
   verificationToken: string
 ): string => {
+  const verificationLink = `${FRONTEND_PUBLIC_URL}/verify/${verificationToken}`;
+
   return `
-  <!DOCTYPE html>
+    <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Email verification</title>
+        <title>Verify Your Email</title>
     </head>
-    <body>
-        <p>
-            Dear <strong>${names}</strong>, thank you for using child welfare system.
-            Below is the link below to verify your email address.
-        </p>
-        <h1
-        style="
-            border-radius: 10px;
-            padding: 1.5rem;
-            text-align: center;
-            background-color: blue;
-            color: white;
-            margin: 10px 0px;
-        "
-        >
-            <a
-                style="color: white; display: block; text-align: center; padding: 2rem"
-                href="${
-                  BACKEND_PUBLIC_URL +
-                  "/api/v1/auth/verify/" +
-                  verificationToken
-                }"
-                >Click here to verify your email Now!</a
-            >
-        </h1>
-        <p>
-            <strong>NB: if you did not initiate this action, please ignore this email. Your
-            account is safe with us.</strong>
+    <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #0000FF;">Welcome to the Children Welfare System</h2>
+        <p>Dear <strong>${names}</strong>,</p>
+        <p>Thank you for registering. Please confirm your email address to activate your account and gain access to the portal.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="${verificationLink}" 
+               style="background-color: #0000FF; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+               Verify Email Now
+            </a>
+        </div>
+        <p style="font-size: 0.9rem; color: #666;">
+            <strong>NB:</strong> If you did not sign up for this account, you can safely ignore this email.
         </p>
     </body>
     </html>
- `;
+  `;
 };
 
+/**
+ * FIX: Added Advisor Login Details Template
+ * This resolves the TS2305 error in advisors.service.ts
+ */
 export const advisorLoginDetailsEmailTemplate = (
   names: string,
   password: string,
   email: string
 ): string => {
   return `
-  <!DOCTYPE html>
+    <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Login Credentials</title>
+        <title>Advisor Login Credentials</title>
     </head>
-    <body>
-        <p>
-        Dear <b>${names}</b>, <br />
-        We are pleased to inform you that your login details as a
-        <b>Village Health Advisor</b> for <a href="${FRONTEND_PUBLIC_URL}">Children welfare portal</a> have
-        been successfully created. Please find your login credentials below:
+    <body style="font-family: 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #0000FF;">CWFP Health Advisor Account</h2>
+        <p>Dear <strong>${names}</strong>,</p>
+        <p>Your account as a Health Advisor has been created. Use the credentials below to log in to the system:</p>
+        
+        <div style="background-color: #f4f4f4; padding: 15px; border-left: 5px solid #0000FF; margin: 20px 0;">
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Temporary Password:</strong> ${password}</p>
+        </div>
+
+        <p>Please change your password immediately after your first login.</p>
+        <p style="font-size: 0.9rem; color: #666;">
+            Access the portal here: <a href="${FRONTEND_PUBLIC_URL}/login" style="color: #0000FF;">${FRONTEND_PUBLIC_URL}/login</a>
         </p>
-        <h1
-        style="
-            border-radius: 10px;
-            padding: 2rem;
-            background-color: blue;
-            color: white;
-            margin: 10px 0px;
-        "
-        >
-        <p>Email: <b>${email}</b></p>
-        <p>Password: <b>${password}</b></p>
-        </h1>
-        <p>
-        For security reasons, we recommend that you change your password after
-        logging in for the first time.
-        </p>
-        <p>Best Regards!</p>
     </body>
     </html>
   `;

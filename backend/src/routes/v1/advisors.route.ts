@@ -7,6 +7,10 @@ import { protectRoute } from "../../middlewares/protectRoute.middleware";
 
 const router = Router();
 
+/**
+ * Admin: Register a new Health Advisor
+ * Triggered by: Admin Dashboard
+ */
 router.post(
   "/",
   authMiddleware,
@@ -15,6 +19,10 @@ router.post(
   advisorsController.registerAdvisor
 );
 
+/**
+ * Admin: Approve an advisor's account
+ * Parameter :id is now a UUID string
+ */
 router.post(
   "/approve/:id",
   authMiddleware,
@@ -22,6 +30,9 @@ router.post(
   advisorsController.approveAdvisor
 );
 
+/**
+ * Admin: Reject/Deactivate an advisor
+ */
 router.post(
   "/reject/:id",
   authMiddleware,
@@ -29,6 +40,9 @@ router.post(
   advisorsController.rejectAdvisor
 );
 
+/**
+ * Admin: View all registered advisors
+ */
 router.get(
   "/",
   authMiddleware,
@@ -36,6 +50,10 @@ router.get(
   advisorsController.findAllAdvisors
 );
 
+/**
+ * Advisor: View children within their specific jurisdiction
+ * Jurisdiction logic is handled in user.service.ts via JSONB address matching
+ */
 router.get(
   "/children",
   authMiddleware,
@@ -43,6 +61,9 @@ router.get(
   advisorsController.findAdvisorChildren
 );
 
+/**
+ * Advisor: View parents within their specific jurisdiction
+ */
 router.get(
   "/parents",
   authMiddleware,

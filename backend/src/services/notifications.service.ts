@@ -1,106 +1,140 @@
-import notificationsModel from "../models/notifications.models";
-import { INotification } from "../interfaces/notifications.interface";
-import { IChild, IChildHealthData } from "../interfaces/child.interface";
-import childHealthDataModel from "../models/childHealthData.model";
-import { HttpException } from "../exceptions/HttpException";
 import httpStatus from "http-status";
 import OpenAI from "openai";
-import userModel from "../models/users.model";
-import childModel from "../models/child.model";
+import { supabase } from "../db";
+import { INotification } from "../interfaces/notifications.interface";
+import { HttpException } from "../exceptions/HttpException";
 import { sendEmail } from "../utils/util";
 
+// Define the shape of the Supabase join result to fix TS2339
+interface HealthRecordJoin {
+  healthCondition: string;
+  child: {
+    firstName: string;
+    lastName: string;
+    parent: {
+      id: string;
+      email: string;
+      names: string;
+    };
+  }[]; // Supabase returns joins as arrays by default
+}
+
+// Initialize OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPEN_API_SECRET_KEY,
+  organization: process.env.OPEN_API_ORGANIZATION_ID,
+});
+
+/**
+ * Identify unhealthy children and send AI-generated nutritional alerts to parents
+ */
 export const sendAlert = async () => {
   const date = new Date();
   const month = date.getMonth() + 1;
   const year = date.getFullYear();
-  const childrenHealthData: IChildHealthData[] =
-    await childHealthDataModel.find({
-      $or: [{ healthCondition: "red" }, { healthCondition: "yellow" }],
-      year,
-      month,
-    });
 
-  if (childrenHealthData.length === 0)
-    throw new HttpException(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      "Currently, there is no unhealthy children found in the system"
-    );
+  // 1. Fetch health data AND parent info
+  const { data, error } = await supabase
+    .from('child_health_data')
+    .select(`
+      healthCondition,
+      child:children!childId (
+        firstName,
+        lastName,
+        parent:users!parentId (id, email, names)
+      )
+    `)
+    .in('healthCondition', ['red', 'yellow'])
+    .eq('year', year)
+    .eq('month', month);
 
-  console.log({ healthData: childrenHealthData.length });
+  // Cast the data to our interface
+  const records = data as unknown as HealthRecordJoin[];
 
-  //for the sake of saving the tokens, we send same message to all parents
+  if (error || !records || records.length === 0) {
+    throw new HttpException(httpStatus.NOT_FOUND, "No unhealthy children found for this period.");
+  }
+
   try {
-    const openai = new OpenAI({
-      organization: process.env.OPEN_API_ORGANIZATION_ID,
-      apiKey: process.env.OPEN_API_SECRET_KEY,
-    });
-
-    const generalInfo = `I need a random list of 10 ingredients to prepare nutritious meals for malnourished children.`;
-
+    // 2. Get Nutritional Advice from AI
     const completion = await openai.chat.completions.create({
-      messages: [{ role: "user", content: generalInfo }],
+      messages: [{ 
+        role: "user", 
+        content: "I need a list of 10 essential ingredients to prepare nutritious meals for malnourished children. Keep it concise." 
+      }],
       model: "gpt-3.5-turbo",
     });
 
-    if (completion?.choices) {
-      const response = completion.choices[0].message;
-      for (let i = 0; i < childrenHealthData.length; i++) {
-        const child: IChild = await childModel.findOne({
-          //@ts-ignore
-          _id: childrenHealthData[i]._doc.childId,
-        });
+    const aiAdvice = completion.choices[0]?.message?.content;
+    if (!aiAdvice) throw new Error("AI failed to provide content.");
 
-        if (child) {
-          const parent = await userModel.findOne({
-            _id: child.parentId,
-          });
-          if (parent) {
-            const title = `Essential Foods to Combat Malnutrition  for ${child.firstName} ${child.middleName} ${child.lastName} `;
-            await sendNotification(parent._id, title, response.content);
-            await sendEmail(title, parent.email as any, response.content);
-          }
-        }
+    // 3. Dispatch Notifications
+    for (const record of records) {
+      // Access the first element of the joined arrays safely
+      const child = record.child?.[0];
+      const parent = child?.parent?.[0];
+
+      if (child && parent && parent.email) {
+        const title = `Nutritional Guide for ${child.firstName} ${child.lastName}`;
+        
+        // Save In-App Notification
+        await sendNotification(parent.id, title, aiAdvice);
+        
+        // Send External Email
+        await sendEmail(title, parent.email, aiAdvice);
       }
-    } else {
-      throw new HttpException(
-        httpStatus.BAD_REQUEST,
-        "Could not be able to communicate with our AI model, please try again later."
-      );
     }
-  } catch (error) {
-    throw new HttpException(
-      httpStatus.BAD_REQUEST,
-      "Something went wrong, " + error.message
-    );
+    
+    return { success: true, alertedCount: records.length };
+  } catch (error: any) {
+    throw new HttpException(httpStatus.BAD_REQUEST, `Alerting failed: ${error.message}`);
   }
 };
 
-export const sendNotification = async (
-  userId: string,
-  title: string,
-  message: string
-) => {
+/**
+ * Save in-app notification to database
+ */
+export const sendNotification = async (userId: string, title: string, message: string) => {
   try {
-    await notificationsModel.create({ title, userId, content: message });
+    await supabase
+      .from('notifications')
+      .insert([{ userId, title, content: message, isRead: false }]);
   } catch (error) {
-    console.log({ error });
+    console.error("Notification logging failed:", error);
   }
 };
 
+/**
+ * Mark all user notifications as read
+ */
 export const readAllNotifications = async (userId: string) => {
-  await notificationsModel.updateMany({ userId }, { isRead: true });
+  await supabase
+    .from('notifications')
+    .update({ isRead: true })
+    .eq('userId', userId);
 };
 
+/**
+ * Get user notifications
+ */
+export const getNotifications = async (userId: string): Promise<INotification[]> => {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('userId', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new HttpException(500, error.message);
+  return data as INotification[];
+};
+
+/**
+ * Delete specific notification
+ */
 export const deleteNotification = async (id: string, userId: string) => {
-  await notificationsModel.deleteOne({ _id: id, userId });
-};
-
-export const getNotifications = async (
-  userId: string
-): Promise<INotification[]> => {
-  const notifications: INotification[] = await notificationsModel.find({
-    userId,
-  });
-
-  return notifications;
+  await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', id)
+    .eq('userId', userId);
 };

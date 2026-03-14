@@ -7,7 +7,16 @@ import { protectRoute } from "../../middlewares/protectRoute.middleware";
 
 const router = Router();
 
+/**
+ * Public/User: Get all health standards
+ * Used to populate charts or reference tables in the UI.
+ */
 router.get("/", authMiddleware, measurementsController.getMeasurements);
+
+/**
+ * Admin: Add a new growth standard record
+ * Logic: Must strictly follow the MeasurementDto to ensure data integrity.
+ */
 router.post(
   "/",
   authMiddleware,
@@ -16,6 +25,10 @@ router.post(
   measurementsController.createMeasurement
 );
 
+/**
+ * Admin: Edit an existing standard
+ * Note: :id is the UUID of the measurement record.
+ */
 router.post(
   "/:id",
   authMiddleware,
@@ -24,6 +37,9 @@ router.post(
   measurementsController.editMeasurement
 );
 
+/**
+ * Admin: Delete a specific standard
+ */
 router.delete(
   "/:id",
   authMiddleware,

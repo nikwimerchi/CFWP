@@ -1,29 +1,18 @@
-import { model, Schema, Document } from "mongoose";
-import { IMeasurement } from "../interfaces/measurements.interface";
+// src/models/measurements.model.ts
 
-const userSchema: Schema = new Schema(
-  {
-    age: { type: Number, required: true },
-    months: { type: Number, required: true },
-
-    redHeight: { type: Number, required: true },
-    yellowHeight: { type: Number, required: true },
-    greenHeight: { type: Number, required: true },
-
-    redWeight: { type: Number, required: true },
-    yellowWeight: { type: Number, required: true },
-    greenWeight: { type: Number, required: true },
-
-    redWidth: { type: Number, required: true },
-    yellowWidth: { type: Number, required: true },
-    greenWidth: { type: Number, required: true },
-  },
-  { timestamps: true }
-);
-
-const measurementsModel = model<IMeasurement & Document>(
-  "Measurements",
-  userSchema
-);
-
-export default measurementsModel;
+export interface Measurement {
+  id: string;              // UUID from Supabase
+  age: number;
+  months: number;
+  redHeight: number;
+  yellowHeight: number;
+  greenHeight: number;
+  redWeight: number;
+  yellowWeight: number;
+  greenWeight: number;
+  redWidth: number;
+  yellowWidth: number;
+  greenWidth: number;
+  created_at?: string;
+  updated_at?: string;
+}

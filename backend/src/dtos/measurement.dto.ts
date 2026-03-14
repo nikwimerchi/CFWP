@@ -1,37 +1,85 @@
-import { IsNumber, Max } from "class-validator";
+import { IsNumber, Max, IsOptional } from "class-validator";
 
 export class MeasurementDto {
   @IsNumber()
-  age: number;
+  public age: number;
 
   @IsNumber()
   @Max(12, { message: "Invalid month" })
-  months: number;
+  public months: number;
 
   @IsNumber()
-  redHeight: number;
+  public redHeight: number;
 
   @IsNumber()
-  yellowHeight: number;
+  public yellowHeight: number;
 
   @IsNumber()
-  greenHeight: number;
+  public greenHeight: number;
 
   @IsNumber()
-  redWeight: number;
+  public redWeight: number;
 
   @IsNumber()
-  yellowWeight: number;
+  public yellowWeight: number;
 
   @IsNumber()
-  greenWeight: number;
+  public greenWeight: number;
 
   @IsNumber()
-  redWidth: number;
+  public redWidth: number;
 
   @IsNumber()
-  yellowWidth: number;
+  public yellowWidth: number;
 
   @IsNumber()
-  greenWidth: number;
+  public greenWidth: number;
+}
+
+// Use this for PATCH/PUT requests to allow partial updates
+export class EditMeasurementDto {
+  @IsNumber()
+  @IsOptional()
+  public age?: number;
+
+  @IsNumber()
+  @Max(12)
+  @IsOptional()
+  public months?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public redHeight?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public yellowHeight?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public greenHeight?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public redWeight?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public yellowWeight?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public greenWeight?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public redWidth?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public yellowWidth?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public greenWidth?: number;
 }

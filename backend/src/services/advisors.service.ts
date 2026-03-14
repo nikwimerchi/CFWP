@@ -1,34 +1,32 @@
 import { hash } from "bcryptjs";
-import { isEmpty } from "class-validator";
-import { CreateAdvisorDto } from "../dtos/users.dto";
-import { IUser } from "../interfaces/users.interface";
-import { HttpException } from "../exceptions/HttpException";
 import httpStatus from "http-status";
-import userModel from "../models/users.model";
+import { supabase } from "../db";
+import { CreateAdvisorDto } from "../dtos/users.dto";
+// FIX: Use the new User model to resolve email property conflicts
+import { User } from "../models/users.model"; 
+import { HttpException } from "../exceptions/HttpException";
 import { logger } from "../utils/logger";
-import { generatePassword, sendEmail } from "../utils/util";
+import { generatePassword, sendEmail, isEmpty } from "../utils/util";
 import { advisorLoginDetailsEmailTemplate } from "../utils/emailTemplates";
-import { IChild, IChildWithParent } from "../interfaces/child.interface";
-import childModel from "../models/child.model";
+import { IChildWithParent } from "../interfaces/child.interface";
 
-export async function registerAdvisor(
-  userData: CreateAdvisorDto
-): Promise<IUser> {
-  if (isEmpty(userData))
-    throw new HttpException(httpStatus.BAD_REQUEST, "Advisor data is empty");
+/**
+ * Register a new Health Advisor
+ */
+export async function registerAdvisor(userData: CreateAdvisorDto): Promise<User> {
+  if (isEmpty(userData)) throw new HttpException(httpStatus.BAD_REQUEST, "Advisor data is empty");
 
-  const findUser: IUser = await userModel.findOne({ email: userData.email });
-  if (findUser)
-    throw new HttpException(
-      httpStatus.CONFLICT,
-      `This email ${userData.email} already exists`
-    );
+  const { data: findUser } = await supabase
+    .from('users')
+    .select('email')
+    .eq('email', userData.email)
+    .maybeSingle();
+
+  if (findUser) throw new HttpException(httpStatus.CONFLICT, `This email ${userData.email} already exists`);
 
   const password = generatePassword(8);
-
   const hashedPassword = await hash(password, 10);
 
-  //sending verification email
   const email = await sendEmail(
     "CWFP Health Advisor Login Credentials",
     userData.email,
@@ -37,109 +35,123 @@ export async function registerAdvisor(
 
   if (!email.sent) {
     logger.error("Failed to send verification email to: " + userData.email);
-    logger.error(email.details);
-    throw new HttpException(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      `Something went wrong while sending login details to ${userData.email}. Please try again later`
-    );
+    throw new HttpException(httpStatus.INTERNAL_SERVER_ERROR, `Email delivery failed`);
   }
-  logger.info("Verification email sent to: " + userData.email);
 
-  const createUserData: IUser = await userModel.create({
-    ...userData,
-    password: hashedPassword,
-    role: "advisor",
-    isEmailVerified: true,
-    isVerified: true,
-  });
+  // Map to snake_case DB columns if necessary (e.g., phone_number, is_verified)
+  const { data: createUserData, error } = await supabase
+    .from('users')
+    .insert([{
+      ...userData,
+      password: hashedPassword,
+      role: "advisor",
+      is_email_verified: true,
+      is_verified: true,
+    }])
+    .select()
+    .single();
 
-  return createUserData;
+  if (error) throw new HttpException(httpStatus.INTERNAL_SERVER_ERROR, error.message);
+  
+  const { password: _, ...userResponse } = createUserData;
+  return userResponse as unknown as User;
 }
 
-export const approveAdvisor = async (id: string): Promise<IUser> => {
-  const findAdvisor: IUser = await userModel.findOneAndUpdate(
-    { _id: id },
-    {
-      isVerified: true,
-    }
-  );
-  if (!findAdvisor)
-    throw new HttpException(httpStatus.BAD_REQUEST, `Advisor not found`);
+/**
+ * Update Advisor Status (Approve)
+ */
+export const approveAdvisor = async (id: string): Promise<User> => {
+  const { data: findAdvisor, error } = await supabase
+    .from('users')
+    .update({ is_verified: true })
+    .eq('id', id)
+    .select()
+    .single();
 
-  return findAdvisor;
+  if (error || !findAdvisor) throw new HttpException(httpStatus.BAD_REQUEST, `Advisor not found`);
+  return findAdvisor as unknown as User;
 };
 
-export const rejectAdvisor = async (id: string): Promise<IUser> => {
-  const findAdvisor: IUser = await userModel.findOneAndUpdate(
-    { _id: id },
-    {
-      isVerified: false,
-    }
-  );
-  if (!findAdvisor)
-    throw new HttpException(httpStatus.BAD_REQUEST, `Advisor not found`);
+/**
+ * FIX: Added missing rejectAdvisor function
+ */
+export const rejectAdvisor = async (id: string): Promise<User> => {
+  const { data: findAdvisor, error } = await supabase
+    .from('users')
+    .update({ is_verified: false }) // Logic for rejection (usually setting verified to false or updating a status column)
+    .eq('id', id)
+    .select()
+    .single();
 
-  return findAdvisor;
+  if (error || !findAdvisor) throw new HttpException(httpStatus.BAD_REQUEST, `Advisor not found`);
+  return findAdvisor as unknown as User;
 };
 
+/**
+ * Find All Advisors (Paginated)
+ */
 export const findAllAdvisors = async (
   filter: object,
   skip: number,
   limit: number
-): Promise<{ advisors: IUser[]; total: number }> => {
-  //all
-  const allAdvisors: IUser[] = await userModel.find({ role: "advisor" });
+): Promise<{ advisors: User[]; total: number }> => {
+  const { data: advisors, count, error } = await supabase
+    .from('users')
+    .select('*', { count: 'exact' })
+    .eq('role', 'advisor')
+    .match(filter)
+    .range(skip, skip + limit - 1);
 
-  //specific
-  const advisors: IUser[] = await userModel
-    .find({ ...filter, role: "advisor" })
-    .select("-password") // Exclude password field
-    .skip(skip)
-    .limit(limit);
+  if (error) throw new HttpException(500, error.message);
 
-  return { advisors, total: allAdvisors.length };
+  const sanitizedAdvisors = advisors.map(({ password, ...rest }) => rest as unknown as User);
+  return { advisors: sanitizedAdvisors, total: count || 0 };
 };
 
+/**
+ * Find Children assigned to an Advisor's location
+ */
 export const findAdvisorChildren = async (
-  advisor: IUser,
-  filters: Object
+  advisor: User, // Use the new User type here
+  filters: object
 ): Promise<IChildWithParent[]> => {
-  const children: IChildWithParent[] = [];
+  const { data: children, error } = await supabase
+    .from('children')
+    .select('*, parent:users!parentId(*)')
+    .contains('address', {
+      province: advisor.address.province,
+      district: advisor.address.district,
+      sector: advisor.address.sector,
+      cell: advisor.address.cell,
+      village: advisor.address.village,
+    })
+    .match(filters);
 
-  const allChildren: IChild[] = await childModel.find({
-    "address.province": advisor.address.province,
-    "address.district": advisor.address.district,
-    "address.sector": advisor.address.sector,
-    "address.cell": advisor.address.cell,
-    "address.village": advisor.address.village,
-    ...filters,
-  });
+  if (error) throw new HttpException(500, error.message);
 
-  for (let i = 0; i < allChildren.length; i++) {
-    const child = allChildren[i];
-    const parent = await userModel
-      .findOne({ _id: child.parentId })
-      .select("-password");
-    if (parent) {
-      //@ts-ignore
-      children.push({ ...child._doc, parent });
-    }
-  }
-
-  return children;
+  return children.map(child => {
+    if (child.parent) delete child.parent.password;
+    return child;
+  }) as unknown as IChildWithParent[];
 };
 
-export const findAdvisorParent = async (advisor: IUser): Promise<IUser[]> => {
-  const parents: IUser[] = await userModel
-    .find({
-      "address.province": advisor.address.province,
-      "address.district": advisor.address.district,
-      "address.sector": advisor.address.sector,
-      "address.cell": advisor.address.cell,
-      "address.village": advisor.address.village,
-      role: "parent",
-    })
-    .select("-password");
+/**
+ * Find Parents in Advisor's location
+ */
+export const findAdvisorParent = async (advisor: User): Promise<User[]> => {
+  const { data: parents, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('role', 'parent')
+    .contains('address', {
+      province: advisor.address.province,
+      district: advisor.address.district,
+      sector: advisor.address.sector,
+      cell: advisor.address.cell,
+      village: advisor.address.village,
+    });
 
-  return parents;
+  if (error) throw new HttpException(500, error.message);
+
+  return parents.map(({ password, ...rest }) => rest as unknown as User);
 };

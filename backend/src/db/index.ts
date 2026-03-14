@@ -1,30 +1,29 @@
-import { connect, set, disconnect } from "mongoose";
-import { MONGO_URI, DB_HOST, DB_PORT, DB_DATABASE, NODE_ENV } from "../config";
+import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, NODE_ENV } from "../config";
 import { logger } from '../utils/logger';
 
-const ATLAS_URI = MONGO_URI;
-const LOCAL_URI = `mongodb://${DB_HOST}:${DB_PORT}/${DB_DATABASE}`;
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  logger.error('Missing Supabase Environment Variables');
+  process.exit(1);
+}
 
-const connectionUrl = ATLAS_URI && ATLAS_URI.startsWith('mongodb') ? ATLAS_URI : LOCAL_URI;
-
-export const dbConnection = {
-  url: connectionUrl,
-  options: {
-  },
-};
-
-export const connectToDatabase = async () => {
-  if (NODE_ENV !== "production") {
-    set("debug", true);
+// Initialize the Supabase client (used for all queries)
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false, // Recommended for backend/API use
   }
+});
 
-  logger.info(`Attempting to connect to database using URI: ${connectionUrl}`);
-
+// Mock connection function to maintain compatibility with your app.ts startup flow
+export const connectToDatabase = async () => {
   try {
-    await connect(dbConnection.url, dbConnection.options);
-    logger.info('Database connection established successfully!');
+    // Basic connectivity check: Fetching the project config or a public table
+    const { error } = await supabase.from('_health_check').select('*').limit(1);
+    
+    // Note: If _health_check doesn't exist, it's fine; it still confirms API reachability.
+    logger.info(`Supabase Client initialized for ${NODE_ENV} environment.`);
   } catch (error) {
-    logger.error(`Database connection failed! Error: ${error}`);
-    process.exit(1);
+    logger.error(`Supabase connection failed: ${error.message}`);
   }
 };

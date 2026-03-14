@@ -1,11 +1,20 @@
-import { IsNotEmpty, IsNumber, IsString, Max } from "class-validator";
+import { IsNotEmpty, IsString, IsOptional, IsUUID } from "class-validator";
 
 export class ChatDto {
   @IsNotEmpty()
   @IsString()
-  childId: string;
+  @IsUUID() // Supabase uses UUIDs for IDs
+  public childId: string;
 
   @IsNotEmpty()
   @IsString()
-  content: string;
+  public content: string;
+}
+
+// Use this if you implement "Edit Message" functionality
+export class EditChatDto {
+  @IsNotEmpty()
+  @IsString()
+  @IsOptional()
+  public content?: string;
 }

@@ -1,39 +1,35 @@
 import { Response } from "express";
 import httpStatus from "http-status";
-import * as healtDataService from "../services/healthData.service";
 import { RequestWithUser } from "../interfaces/auth.interface";
+import * as healthDataService from "../services/healthData.service";
 import { ChildHealthDataDto } from "../dtos/healthData.dto";
-import { IChildHealthData } from "../interfaces/child.interface";
 
-export const registerHealthData = async (
-  req: RequestWithUser,
-  res: Response
-) => {
+// FIX for TS2551: Renamed to registerHealthData to match route expectation
+export const registerHealthData = async (req: RequestWithUser, res: Response) => {
   try {
     const data: ChildHealthDataDto = req.body;
-    const savedData: IChildHealthData =
-      await healtDataService.registerChildHealthData(data, req.user);
+    const savedData = await healthDataService.registerChildHealthData(data, req.user);
 
     res.status(httpStatus.CREATED).json({
       data: savedData,
-      message: "Child HealthData has been recorded",
+      message: "Health data recorded successfully",
     });
   } catch (error) {
-    return res.status(httpStatus.BAD_REQUEST).json({ message: error.message });
+    res.status(httpStatus.BAD_REQUEST).json({ message: error.message });
   }
 };
 
+// FIX for TS2769: This MUST take (req, res), not (childId, year)
 export const getHealthData = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
     const { year } = req.query;
-    const y = year ? Number(year) : new Date().getFullYear();
-    const data = await healtDataService.getHealthData(id, y);
+    const selectedYear = year ? Number(year) : new Date().getFullYear();
 
-    res.status(httpStatus.CREATED).json({
-      data,
-    });
+    const data = await healthDataService.getHealthData(id, selectedYear);
+
+    res.status(httpStatus.OK).json({ data });
   } catch (error) {
-    return res.status(httpStatus.BAD_REQUEST).json({ message: error.message });
+    res.status(httpStatus.BAD_REQUEST).json({ message: error.message });
   }
 };

@@ -16,42 +16,23 @@ interface IRoute {
   route: Router;
 }
 
+/**
+ * Registry of all portal routes.
+ * These paths are prefixed to the individual route definitions.
+ */
 const defaultIRoute: IRoute[] = [
-  { path: "/auth", route: authRoute },
-  {
-    path: "/users",
-    route: userRoute,
-  },
-  {
-    path: "/child",
-    route: childRoute,
-  },
-  {
-    path: "/advisors",
-    route: advisorsRoute,
-  },
-  {
-    path: "/parents",
-    route: parentsRoute,
-  },
-  {
-    path: "/measurements",
-    route: measurements,
-  },
-  {
-    path: "/healthData",
-    route: healthData,
-  },
-  {
-    path: "/chat",
-    route: chats,
-  },
-  {
-    path: "/notifications",
-    route: notifications,
-  },
+  { path: "/auth", route: authRoute },           // Login, Signup, Verification
+  { path: "/users", route: userRoute },          // General User Management
+  { path: "/child", route: childRoute },         // Child registration & Approval
+  { path: "/advisors", route: advisorsRoute },   // Advisor jurisdiction & specialized actions
+  { path: "/parents", route: parentsRoute },     // Parent-specific data retrieval
+  { path: "/measurements", route: measurements }, // WHO Health Standard management
+  { path: "/healthData", route: healthData },    // Monthly growth tracking records
+  { path: "/chat", route: chats },               // AI Health Assistant interactions
+  { path: "/notifications", route: notifications }, // System alerts & Nutritional advice
 ];
 
+// Mount all routes dynamically
 defaultIRoute.forEach((route) => {
   router.use(route.path, route.route);
 });

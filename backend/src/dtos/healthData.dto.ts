@@ -1,25 +1,52 @@
-import { IsNotEmpty, IsNumber, IsString } from "class-validator";
+import { IsNotEmpty, IsNumber, IsString, IsOptional, IsDateString } from "class-validator";
 
 export class ChildHealthDataDto {
   @IsString()
   @IsNotEmpty()
-  childId: string;
+  public childId: string;
 
   @IsNumber()
-  height: number;
+  public height: number;
 
   @IsNumber()
-  width: number;
+  public width: number;
 
   @IsNumber()
-  month: number;
+  public weight: number;
 
   @IsNumber()
-  year: number;
-
-  @IsString()
-  date: string;
+  public month: number;
 
   @IsNumber()
-  weight: number;
+  public year: number;
+
+  @IsDateString() // Better validation for ISO date strings
+  public date: string;
+}
+
+// Use this for PATCH requests to allow partial updates
+export class EditChildHealthDataDto {
+  @IsNumber()
+  @IsOptional()
+  public height?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public width?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public weight?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public month?: number;
+
+  @IsNumber()
+  @IsOptional()
+  public year?: number;
+
+  @IsDateString()
+  @IsOptional()
+  public date?: string;
 }

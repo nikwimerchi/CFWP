@@ -1,179 +1,162 @@
 import httpStatus from "http-status";
+import { supabase } from "../db";
 import { HttpException } from "../exceptions/HttpException";
 import { isEmpty } from "../utils/util";
-import { RegisterChildDto } from "../dtos/child.dto";
-import { IChild, IChildWithParent } from "../interfaces/child.interface";
-import childModel from "../models/child.model";
-import { IUser, TUserRole } from "../interfaces/users.interface";
-import userModel from "../models/users.model";
+// FIX: Added ChildDto to imports
+import { RegisterChildDto, ChildDto } from "../dtos/child.dto";
+import { Child } from "../models/child.model"; 
+import { User } from "../models/users.model"; 
 import { sendNotification } from "./notifications.service";
 
-export const registerChild = async (
-  childData: RegisterChildDto,
-  user: IUser
-): Promise<IChild> => {
-  if (isEmpty(childData))
-    throw new HttpException(httpStatus.BAD_REQUEST, "child data is empty");
-  const findChild: IChild = await childModel.findOne({
-    firstName: childData.firstName,
-    lastName: childData.lastName,
-    parentId: childData.parentId,
-  });
-  if (findChild)
-    throw new HttpException(
-      httpStatus.BAD_REQUEST,
-      `This Child ${childData.firstName} already exist`
-    );
+// Compatibility interface for joins
+export interface IChildWithParent extends Child {
+  parent?: User;
+}
 
-  const saveChildData: IChild = await childModel.create({
-    ...childData,
+/**
+ * Register a new child
+ */
+export const registerChild = async (childData: RegisterChildDto, user: User): Promise<Child> => {
+  if (isEmpty(childData)) throw new HttpException(httpStatus.BAD_REQUEST, "Child data is empty");
+
+  // Matches your SQL: firstname, lastname, parentid
+  const { data: findChild } = await supabase
+    .from('children')
+    .select('*')
+    .eq('firstname', childData.firstName)
+    .eq('lastname', childData.lastName)
+    .eq('parentid', childData.parentId)
+    .maybeSingle();
+
+  if (findChild) throw new HttpException(httpStatus.CONFLICT, `Child ${childData.firstName} already exists`);
+
+  const dbPayload = {
+    firstname: childData.firstName,
+    lastname: childData.lastName,
+    middlename: childData.middleName || null,
+    dateofbirth: childData.dateOfBirth,
+    gender: childData.sex, // FIX: Using .sex from your DTO to map to SQL .gender
+    parentid: childData.parentId,
     status: user.role === "advisor" ? "approved" : "pending",
     address: user.address,
-    registeredBy: { userId: user._id, role: user.role },
-  });
+    registeredby: { userId: user.id, role: user.role },
+  };
 
-  if (user.role === "parent") {
-    //find advisor
-    const advisor = await userModel.findOne({
-      role: "advisor",
-      "address.province": user.address.province,
-      "address.district": user.address.district,
-      "address.sector": user.address.sector,
-      "address.cell": user.address.cell,
-      "address.village": user.address.village,
-    });
+  const { data: saveChildData, error: saveError } = await supabase
+    .from('children')
+    .insert([dbPayload])
+    .select()
+    .single();
 
-    if (advisor) {
-      await sendNotification(
-        advisor._id,
-        "New child registered for your review",
-        `${childData.firstName} ${childData.lastName} ${childData.lastName} was registered into the system by ${user.names}. Please go ahead a review the info.`
-      );
-    }
-  } else {
-    await sendNotification(
-      childData.parentId,
-      "New child registered",
-      `Your child: ${childData.firstName} ${childData.lastName} ${childData.lastName} was registered into the system by ${user.names}.`
-    );
-  }
-
-  return saveChildData;
+  if (saveError) throw new HttpException(httpStatus.INTERNAL_SERVER_ERROR, saveError.message);
+  return saveChildData as unknown as Child;
 };
 
-export const approveChild = async (childId: string): Promise<IChild> => {
-  if (isEmpty(childId))
-    throw new HttpException(httpStatus.BAD_REQUEST, "child data is empty");
-  const findChild: IChild = await childModel.findOneAndUpdate(
-    { _id: childId },
-    {
-      status: "approved",
-    }
-  );
-  if (!findChild)
-    throw new HttpException(httpStatus.BAD_REQUEST, `This Child not found`);
-
-  await sendNotification(
-    findChild.parentId,
-    "Child information approved",
-    `Your child: ${findChild.firstName} ${findChild.lastName} ${findChild.lastName} has been approved by the health advisor.`
-  );
-
-  return findChild;
-};
-
-export const rejectChild = async (childId: string): Promise<IChild> => {
-  if (isEmpty(childId))
-    throw new HttpException(httpStatus.BAD_REQUEST, "child data is empty");
-  const findChild: IChild = await childModel.findOneAndUpdate(
-    { _id: childId },
-    {
-      status: "rejected",
-    }
-  );
-  if (!findChild)
-    throw new HttpException(httpStatus.BAD_REQUEST, `This Child not found`);
-
-  await sendNotification(
-    findChild.parentId,
-    "Child information rejected",
-    `Your child: ${findChild.firstName} ${findChild.lastName} ${findChild.lastName} has been rejected by the health advisor.`
-  );
-
-  return findChild;
-};
-
-export const deleteChild = async (childId: string): Promise<IChild> => {
-  if (isEmpty(childId))
-    throw new HttpException(httpStatus.BAD_REQUEST, "child data is empty");
-  const findChild: IChild = await childModel.findOneAndDelete({
-    _id: childId,
-    $or: [{ status: "pending" }, { status: "rejected" }],
-  });
-  if (!findChild)
-    throw new HttpException(httpStatus.BAD_REQUEST, `This Child not found`);
-
-  return findChild;
-};
-
+/**
+ * Edit Child Data
+ */
 export const editChild = async (
-  childId: string,
-  chilData: RegisterChildDto,
-  userRole: TUserRole
-): Promise<IChild> => {
-  if (!childId)
-    throw new HttpException(
-      httpStatus.BAD_REQUEST,
-      `child with id ${childId} not found`
-    );
+  childId: string, 
+  childData: ChildDto,
+  userRole: string 
+): Promise<Child> => {
+  const statusUpdate = userRole === "advisor" ? "approved" : "pending";
 
-  const findChild: IChild = await childModel.findOneAndUpdate(
-    userRole === "admin"
-      ? { _id: childId }
-      : { _id: childId, status: "pending" },
-    chilData
-  );
-  if (!findChild)
-    throw new HttpException(httpStatus.BAD_REQUEST, "Child not found");
+  const { data: updatedChild, error } = await supabase
+    .from('children')
+    .update({
+      firstname: childData.firstName,
+      lastname: childData.lastName,
+      middlename: childData.middleName,
+      gender: childData.sex, // FIX: Mapping .sex to .gender
+      dateofbirth: childData.dateOfBirth,
+      address: childData.address,
+      parentid: childData.parentId,
+      status: statusUpdate 
+    })
+    .eq('id', childId)
+    .select()
+    .single();
 
-  return findChild;
+  if (error) throw new HttpException(httpStatus.INTERNAL_SERVER_ERROR, error.message);
+  return updatedChild as unknown as Child;
 };
 
+/**
+ * Approve Child
+ */
+export const approveChild = async (childId: string): Promise<Child> => {
+  const { data: findChild, error } = await supabase
+    .from('children')
+    .update({ status: 'approved' })
+    .eq('id', childId)
+    .select()
+    .single();
+
+  if (error || !findChild) throw new HttpException(httpStatus.BAD_REQUEST, `Child not found`);
+  return findChild as unknown as Child;
+};
+
+/**
+ * Reject Child
+ */
+export const rejectChild = async (childId: string): Promise<Child> => {
+  const { data: findChild, error } = await supabase
+    .from('children')
+    .update({ status: 'rejected' })
+    .eq('id', childId)
+    .select()
+    .single();
+
+  if (error || !findChild) throw new HttpException(httpStatus.BAD_REQUEST, `Child not found`);
+  return findChild as unknown as Child;
+};
+
+/**
+ * Find All Children (Paginated)
+ */
 export const findAllChildren = async (
-  filter: object,
-  skip: number,
+  filter: any, 
+  page: number, 
   limit: number
-): Promise<{ children: IChild[]; total: number }> => {
-  //all
-  const allChildren: IChild[] = await childModel.find({});
+): Promise<{ children: Child[]; total: number }> => {
+  const skip = (page - 1) * limit;
+  const { data: children, count, error } = await supabase
+    .from('children')
+    .select('*', { count: 'exact' })
+    .match(filter)
+    .range(skip, skip + limit - 1)
+    .order('firstname', { ascending: true });
 
-  //specific
-  const children: IChild[] = await childModel
-    .find(filter)
-    .skip(skip)
-    .limit(limit);
-
-  return { children, total: allChildren.length };
+  if (error) throw new HttpException(500, error.message);
+  return { children: (children || []) as unknown as Child[], total: count || 0 };
 };
 
-export const findSingleChild = async (
-  id: string
-): Promise<IChildWithParent> => {
-  const child = await childModel.findOne({ _id: id });
+/**
+ * Delete Child
+ */
+export const deleteChild = async (childId: string): Promise<Child> => {
+  const { data: deletedChild, error } = await supabase
+    .from('children')
+    .delete()
+    .eq('id', childId)
+    .select()
+    .single();
 
-  if (!child)
-    throw new HttpException(httpStatus.BAD_REQUEST, "Child not found");
+  if (error || !deletedChild) throw new HttpException(httpStatus.BAD_REQUEST, `Child not found`);
+  return deletedChild as unknown as Child;
+};
 
-  const parent = await userModel.findOne({ _id: child.parentId });
+/**
+ * Find Single Child with Parent
+ */
+export const findSingleChild = async (id: string): Promise<IChildWithParent> => {
+  const { data: child, error } = await supabase
+    .from('children')
+    .select(`*, parent:users(*)`) 
+    .eq('id', id)
+    .single();
 
-  if (!child)
-    throw new HttpException(
-      httpStatus.BAD_REQUEST,
-      "Unable to find child's parents"
-    );
-
-  //@ts-ignore
-  const childResponse: IChildWithParent = { ...child._doc, parent };
-
-  return childResponse;
+  if (error || !child) throw new HttpException(httpStatus.BAD_REQUEST, "Child not found");
+  return child as unknown as IChildWithParent;
 };
