@@ -21,6 +21,7 @@
     "headlessui": "^0.0.0",
     "html-react-parser": "^5.1.10",
     "jsvectormap": "^1.5.3",
+    "lucide-react": "^0.577.0",
     "match-sorter": "^6.3.1",
     "react": "^18.2.0",
     "react-apexcharts": "^1.9.0",
@@ -35,7 +36,7 @@
     "rwanda": "^2.1.6",
     "sort-by": "^0.0.2",
     "tailwind-merge": "^2.3.0",
-    "xlsx": "^0.19.3"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "^18.2.17",
