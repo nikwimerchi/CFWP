@@ -1,4 +1,6 @@
-import logger from './logger';
-import morgan from './morgan';
+// import logger from './logger';
+// import morgan from './morgan';
 
-export { logger, morgan };
+// export { logger, morgan };
+// src/utils/logger/index.ts
+export { default as logger } from './logger';
