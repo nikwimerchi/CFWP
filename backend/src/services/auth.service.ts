@@ -1,164 +1,139 @@
-import { hash, compare } from "bcryptjs";
-import { sign } from "jsonwebtoken";
-import userModel from "../models/users.model";
-import { CreateUserDto, LoginDto } from "../dtos/users.dto";
-import { IUser } from "../interfaces/users.interface";
-import { generateRandomNumber, isEmpty, sendEmail } from "../utils/util";
-import { HttpException } from "../exceptions/HttpException";
-import { DataStoredInToken, TokenData } from "../interfaces/auth.interface";
-import { SECRET_KEY } from "../config";
-import httpStatus from "http-status";
-import { userEmailVerificationTemplate } from "../utils/emailTemplates";
-import { logger } from "../utils/logger";
-import { sendNotification } from "./notifications.service";
+// backend/src/services/auth.service.ts
 
-const users = userModel;
+import userModel, { UserDocument } from '../models/users.model'; // Import your Mongoose model
+import { IUser } from '../interfaces/users.interface';
+import { CreateUserDto, LoginDto } from '../dtos/users.dto';
+import { HttpException } from '../exceptions/HttpException'; // Assume you have this custom exception class
+import crypto from 'crypto'; // For generating secure verification tokens
+import bcrypt from 'bcryptjs'; // For password comparison in login
+import jwt from 'jsonwebtoken'; // For generating JWT tokens
+
+// Assuming you have an email service utility:
+// import { sendVerificationEmail } from '../utils/emailService'; 
+
+// =========================================================================
+// 1. SIGNUP SERVICE
+// =========================================================================
 
 export async function signup(userData: CreateUserDto): Promise<IUser> {
-  if (isEmpty(userData)) throw new HttpException(400, "userData is empty");
-
-  const findUser: IUser = await users.findOne({ email: userData.email });
-  if (findUser)
-    throw new HttpException(
-      httpStatus.CONFLICT,
-      `This email ${userData.email} already exists`
-    );
-
-  const randomNumber = generateRandomNumber();
-  const unsafeVerificationToken = await hash(randomNumber + userData.email, 10);
-  const verificationToken = unsafeVerificationToken
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=/g, "");
-
-  const hashedPassword = await hash(userData.password, 10);
-
-  //sending verification email
-  const email = await sendEmail(
-    "CWFP Email verification",
-    userData.email,
-    userEmailVerificationTemplate(userData.names, verificationToken)
-  );
-
-  if (!email.sent) {
-    logger.error("Failed to send verification email to: " + userData.email);
-    logger.error(email.details);
-    throw new HttpException(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      `Something went wrong while sending verification link to your email address. Please try again later`
-    );
-  }
-  logger.info("Verification email sent to: " + userData.email);
-
-  const createUserData: IUser = await users.create({
-    ...userData,
-    password: hashedPassword,
-    verificationToken,
-  });
-
-  if (userData.role === "advisor") {
-    //find admin,
-    const admin = await userModel.findOne({ role: "admin" });
-    if (admin) {
-      await sendNotification(
-        admin._id,
-        "New advisor signed up",
-        `${userData.names} registered as an advisor and waiting for your approval.`
-      );
+    
+    // 1. Check for duplicates
+    const findUserByEmail = await userModel.findOne({ email: userData.email });
+    if (findUserByEmail) {
+        throw new HttpException(409, `User with email ${userData.email} already exists.`);
     }
-  }
 
-  await sendNotification(
-    createUserData._id,
-    "Thanks for using our platform",
-    `Dear ${userData.names} we appreciate you for trying out our Child and family health welfare system. To gether we can make our families become more happier.`
-  );
+    const findUserByPhone = await userModel.findOne({ phoneNumber: userData.phoneNumber });
+    if (findUserByPhone) {
+        throw new HttpException(409, `User with phone number ${userData.phoneNumber} already exists.`);
+    }
 
-  return createUserData;
+    // 2. Generate the unique verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex'); 
+
+    // 3. Create the new user payload (password hashing is done by the Mongoose pre-save hook)
+    const newUserPayload = { 
+        ...userData, 
+        verificationToken: verificationToken, // Save the token
+        isEmailVerified: false, 
+        role: userData.role || 'parent' // Ensure a default role if not provided
+    };
+    
+    const createdUser: UserDocument = await userModel.create(newUserPayload); 
+
+    // 4. (TODO) Send the verification email (Implement this utility separately)
+    // await sendVerificationEmail(createdUser.email, verificationToken); 
+
+    // Return the user object without sensitive data
+    const userResponse: IUser = createdUser.toObject();
+    delete userResponse.password; 
+    delete userResponse.verificationToken;
+
+    return userResponse;
 }
 
-export async function login(
-  userData: LoginDto
-): Promise<{ cookie: string; findUser: IUser; token: string }> {
-  if (isEmpty(userData))
-    throw new HttpException(httpStatus.NOT_FOUND, "userData is empty");
+// =========================================================================
+// 2. LOGIN SERVICE
+// =========================================================================
 
-  const findUser: IUser = await users.findOne({ email: userData.email });
-  if (!findUser)
-    throw new HttpException(
-      httpStatus.CONFLICT,
-      `This email ${userData.email} was not found`
-    );
+export async function login(userData: LoginDto): Promise<{ cookie: string; findUser: IUser; token: string }> {
+    
+    // 1. Find the user
+    const findUser: UserDocument | null = await userModel.findOne({ email: userData.email });
+    if (!findUser) {
+        throw new HttpException(401, 'Invalid credentials.');
+    }
 
-  const isPasswordMatching: boolean = await compare(
-    userData.password,
-    findUser.password
-  );
-  if (!isPasswordMatching)
-    throw new HttpException(httpStatus.CONFLICT, "Password is not matching");
+    // 2. Compare the password hash
+    const isPasswordMatching = await bcrypt.compare(userData.password, findUser.password);
+    if (!isPasswordMatching) {
+        throw new HttpException(401, 'Invalid credentials.');
+    }
+    
+    // 3. SECURITY CHECK: Ensure email is verified
+    if (!findUser.isEmailVerified) {
+         throw new HttpException(403, 'Email not verified. Please check your inbox for the verification link.');
+    }
 
-  if (!findUser.isEmailVerified)
-    throw new HttpException(
-      httpStatus.CONFLICT,
-      "Your email address is not verified, please check your inbox for more instructions."
-    );
+    // 4. Generate JWT
+    const tokenData = {
+        _id: findUser._id,
+        email: findUser.email,
+        role: findUser.role,
+    };
+    
+    const secret = process.env.JWT_SECRET || 'YOUR_FALLBACK_SECRET_MUST_BE_SECURE'; 
+    const token = jwt.sign(tokenData, secret, { expiresIn: '1d' });
 
-  //restrict advisors to login as long as they are not verified by admin
-  if (findUser.role === "advisor" && !findUser.isVerified)
-    throw new HttpException(
-      httpStatus.CONFLICT,
-      `Dear ${findUser.names}, please wait patiently. Admin must verify your account so that you can be able to login.`
-    );
+    // 5. Generate Cookie (Replace with your actual cookie generation logic)
+    const cookie = `Authorization=${token}; HttpOnly; Max-Age=${60 * 60 * 24}; Path=/`; // 1 day expiry
 
-  const tokenData = createToken(findUser);
-  const cookie = createCookie(tokenData);
+    // 6. Prepare user response (remove password hash)
+    const userResponse: IUser = findUser.toObject();
+    delete userResponse.password; 
+    delete userResponse.verificationToken;
 
-  return { cookie, findUser, token: tokenData.token };
+    return { cookie, findUser: userResponse, token };
 }
+
+// =========================================================================
+// 3. VERIFY EMAIL SERVICE
+// =========================================================================
+
+export async function verifyEmail(verificationToken: string): Promise<void> {
+    
+    // 1. Find the user by the token
+    const findUser: UserDocument | null = await userModel.findOne({ verificationToken });
+
+    if (!findUser) {
+        throw new HttpException(404, 'Verification link is invalid or has expired.');
+    }
+
+    // 2. Update the user document
+    findUser.isEmailVerified = true;
+    findUser.verificationToken = undefined; // Clear the used token for security
+
+    // 3. Save the updated document to MongoDB
+    await findUser.save();
+}
+
+// =========================================================================
+// 4. LOGOUT SERVICE (Simple token clearing)
+// =========================================================================
 
 export async function logout(userData: IUser): Promise<IUser> {
-  if (isEmpty(userData)) throw new HttpException(400, "userData is empty");
+    // In a stateless JWT system, logout is often handled client-side by deleting the token.
+    // If you use a blacklist/revocation list on the server, that logic would go here.
+    
+    const findUser: UserDocument | null = await userModel.findById(userData._id);
+    if (!findUser) {
+        throw new HttpException(404, 'User not found');
+    }
 
-  const findUser: IUser = await users.findOne({
-    email: userData.email,
-    password: userData.password,
-  });
-  if (!findUser)
-    throw new HttpException(
-      httpStatus.CONFLICT,
-      `This email ${userData.email} was not found`
-    );
+    // Prepare response
+    const userResponse: IUser = findUser.toObject();
+    delete userResponse.password; 
+    delete userResponse.verificationToken;
 
-  return findUser;
-}
-
-export async function verifyEmail(
-  verificationToken: string
-): Promise<{ user: IUser }> {
-  if (isEmpty(verificationToken))
-    throw new HttpException(httpStatus.BAD_REQUEST, "Invalid request");
-
-  const findUser: IUser = await users.findOneAndUpdate(
-    { verificationToken, isEmailVerified: false },
-    { isEmailVerified: true }
-  );
-  if (!findUser)
-    throw new HttpException(httpStatus.CONFLICT, `Invalid request`);
-
-  return { user: findUser };
-}
-
-export function createToken(user: IUser): TokenData {
-  const dataStoredInToken: DataStoredInToken = { _id: user._id };
-  const secretKey: string = SECRET_KEY;
-  const expiresIn: number = 60 * 60;
-
-  return {
-    expiresIn,
-    token: sign(dataStoredInToken, secretKey, { expiresIn }),
-  };
-}
-
-export function createCookie(tokenData: TokenData): string {
-  return `Authorization=${tokenData.token}; HttpOnly; Max-Age=${tokenData.expiresIn};`;
+    return userResponse;
 }

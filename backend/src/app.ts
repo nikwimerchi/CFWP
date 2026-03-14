@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config(); // <--- CRITICAL: Load .env variables immediately
+
 import express, { Express } from "express";
 import compression from "compression";
 import cookieParser from "cookie-parser";
@@ -16,7 +19,7 @@ import errorMiddleware from "./middlewares/error.middleware";
 
 const app: Express = express();
 
-//connect to DB
+// Connect to DB (This now runs AFTER dotenv has loaded the MONGO_URI)
 connectToDatabase();
 
 app.use(morgan(LOG_FORMAT));
@@ -28,33 +31,34 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-//swagger
+// swagger
 const swaggerOptions = {
-  swaggerDefinition: {
-    info: {
-      title: "REST API",
-      version: "1.0.0",
-      description: "Example docs",
-    },
-  },
-  apis: ["swagger.yaml"],
+  swaggerDefinition: {
+    info: {
+      title: "REST API",
+      version: "1.0.0",
+      description: "Example docs",
+    },
+  },
+  apis: ["swagger.yaml"],
 };
 
 const specs = swaggerJSDoc(swaggerOptions);
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(specs));
 
-//home route
+// home route
 app.use("/", homeRoute);
 // v1 api routes
 app.use("/api/v1", routes);
 
-//error handler middleware
+// error handler middleware
 app.use(errorMiddleware);
 
 const prt = PORT || 8080;
-app.listen(PORT, () => {
-  logger.info(`=================================`);
-  logger.info(`======= ENV: ${NODE_ENV} =======`);
-  logger.info(`🚀 App listening on the port ${prt}`);
-  logger.info(`=================================`);
+// We should use the PORT constant directly, as it should be defined after dotenv
+app.listen(PORT, () => { 
+  logger.info(`=================================`);
+  logger.info(`======= ENV: ${NODE_ENV} =======`);
+  logger.info(`🚀 App listening on the port ${PORT}`); // Changed prt to PORT
+  logger.info(`=================================`);
 });

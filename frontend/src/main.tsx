@@ -1,37 +1,24 @@
+// frontend/src/main.tsx
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter as Router } from 'react-router-dom';
-import App from './App';
-import './css/style.css';
-import './css/satoshi.css';
-import 'jsvectormap/dist/css/jsvectormap.css';
-import 'flatpickr/dist/flatpickr.min.css';
-import { Provider } from 'react-redux';
-import { persistor, store } from './redux/store';
-import { PersistGate } from 'redux-persist/integration/react';
-import { Toaster } from 'react-hot-toast';
+import App from './App.tsx';
+import './css/style.css'; 
+import { BrowserRouter } from 'react-router-dom'; // 1. Import the BrowserRouter
 
-const AppWithRedux = () => (
-  <Provider store={store}>
-    <PersistGate persistor={persistor}>
-      <App />
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: '#010101',
-            color: '#fff',
-          },
-        }}
-      />
-    </PersistGate>
-  </Provider>
-);
+// Find the root element where the app should mount
+const rootElement = document.getElementById('root');
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <Router>
-      <AppWithRedux />
-    </Router>
-  </React.StrictMode>,
-);
+if (rootElement) {
+  // 2. Wrap the <App /> component with <BrowserRouter> to provide the routing context
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      {/* This wrapper is the final piece to resolve the blank screen crash. */}
+      <BrowserRouter>
+        <App /> 
+      </BrowserRouter>
+    </React.StrictMode>,
+  );
+} else {
+    console.error("Root element with ID 'root' not found in the document.");
+}
