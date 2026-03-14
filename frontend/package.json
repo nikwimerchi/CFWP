@@ -13,6 +13,7 @@
     "email": "nikwimerchi@gmail.com"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.99.1",
     "apexcharts": "^5.3.6",
     "axios": "^1.6.8",
     "clsx": "^2.1.1",
@@ -34,7 +35,7 @@
     "rwanda": "^2.1.6",
     "sort-by": "^0.0.2",
     "tailwind-merge": "^2.3.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.19.3"
   },
   "devDependencies": {
     "@types/react": "^18.2.17",
