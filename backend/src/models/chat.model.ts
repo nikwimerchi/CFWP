@@ -1,4 +1,4 @@
-// src/models/chats.model.ts
+
 
 export interface Chat {
   id?: string;               // UUID from Supabase (optional on create)

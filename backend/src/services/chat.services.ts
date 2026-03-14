@@ -1,11 +1,12 @@
 import httpStatus from "http-status";
 import OpenAI from "openai";
 import { supabase } from "../db";
+import { INotification } from "../interfaces/notifications.interface";
 import { HttpException } from "../exceptions/HttpException";
 import { calculateYearsAndMonths, isEmpty } from "../utils/util";
-import { ChatDto } from "../dtos/chat.dto"; // Corrected path/name
+import { ChatDto } from "../dtos/chat.dto"; 
 import { User } from "../models/users.model"; 
-import { Chat } from "../models/chat"; // Use correct filename casing if your file is 'chat.ts'
+import { Chat } from "../models/chat.model"; 
 
 
 const openai = new OpenAI({
@@ -19,12 +20,12 @@ const openai = new OpenAI({
 export const chatt = async (data: ChatDto, user: User): Promise<Chat> => {
   if (isEmpty(data)) throw new HttpException(httpStatus.BAD_REQUEST, "Invalid data");
 
-  // 1. Verify Child Ownership (Note: Supabase uses snake_case in columns)
+  // 1. Verify Child Ownership
   const { data: child, error: childError } = await supabase
     .from('children')
     .select('*')
     .eq('id', data.childId)
-    .eq('parent_id', user.id) // FIX: parent_id vs parentId
+    .eq('parent_id', user.id) 
     .eq('status', 'approved')
     .single();
 
@@ -32,13 +33,13 @@ export const chatt = async (data: ChatDto, user: User): Promise<Chat> => {
     throw new HttpException(httpStatus.BAD_REQUEST, `Invalid child or unauthorized access.`);
   }
 
-  const { months, years } = calculateYearsAndMonths(child.date_of_birth); // FIX: date_of_birth
+  const { months, years } = calculateYearsAndMonths(child.date_of_birth);
 
   // 2. Fetch Health Data for context
   const { data: healthData, error: healthError } = await supabase
     .from('child_health_data')
     .select('*')
-    .eq('child_id', data.childId); // FIX: child_id
+    .eq('child_id', data.childId);
 
   if (healthError || !healthData || healthData.length === 0) {
     throw new HttpException(
@@ -65,7 +66,7 @@ export const chatt = async (data: ChatDto, user: User): Promise<Chat> => {
     const aiResponse = completion.choices[0]?.message?.content;
 
     if (aiResponse) {
-      // 4. Save to Supabase (Mapping camelCase DTO to snake_case DB)
+      // 4. Save to Supabase
       const chatEntries = [
         { 
           child_id: data.childId, 
@@ -98,7 +99,7 @@ export const chatt = async (data: ChatDto, user: User): Promise<Chat> => {
     } else {
       throw new HttpException(httpStatus.BAD_REQUEST, "AI failed to generate response.");
     }
-  } catch (error) {
+  } catch (error: any) {
     throw new HttpException(httpStatus.INTERNAL_SERVER_ERROR, `AI Service Error: ${error.message}`);
   }
 };
@@ -110,14 +111,14 @@ export const getChatts = async (childId: string, user: User): Promise<Chat[]> =>
   const { data, error } = await supabase
     .from('chats')
     .select('*')
-    .eq('user_id', user.id) // FIX: user_id
-    .eq('child_id', childId) // FIX: child_id
+    .eq('user_id', user.id) 
+    .eq('child_id', childId) 
     .order('created_at', { ascending: true });
 
   if (error) throw new HttpException(500, error.message);
 
   // Map results back to camelCase for the frontend
-  return data.map(chat => ({
+  return (data || []).map(chat => ({
     ...chat,
     childId: chat.child_id,
     userId: chat.user_id,

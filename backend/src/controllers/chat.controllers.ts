@@ -1,8 +1,8 @@
 import { Response } from "express";
 import httpStatus from "http-status";
-import * as chatServices from "../services/chat.service"; // Fixed path (singular service)
+import * as chatServices from "../services/chat.services"; // Fixed path (plural services)
 import { RequestWithUser } from "../interfaces/auth.interface";
-import { ChatDto } from "../dtos/chats.dto"; // Fixed path (plural dto)
+import { ChatDto } from "../dtos/chat.dto"; // Fixed path (plural dto)
 
 export const chat = async (req: RequestWithUser, res: Response) => {
   try {

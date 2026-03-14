@@ -5,6 +5,20 @@ import { INotification } from "../interfaces/notifications.interface";
 import { HttpException } from "../exceptions/HttpException";
 import { sendEmail } from "../utils/util";
 
+// Define the shape of the Supabase join result to fix TS2339
+interface HealthRecordJoin {
+  healthCondition: string;
+  child: {
+    firstName: string;
+    lastName: string;
+    parent: {
+      id: string;
+      email: string;
+      names: string;
+    };
+  }[]; // Supabase returns joins as arrays by default
+}
+
 // Initialize OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPEN_API_SECRET_KEY,
@@ -19,8 +33,8 @@ export const sendAlert = async () => {
   const month = date.getMonth() + 1;
   const year = date.getFullYear();
 
-  // 1. Fetch health data AND parent info in ONE query using Supabase joins
-  const { data: records, error } = await supabase
+  // 1. Fetch health data AND parent info
+  const { data, error } = await supabase
     .from('child_health_data')
     .select(`
       healthCondition,
@@ -34,12 +48,15 @@ export const sendAlert = async () => {
     .eq('year', year)
     .eq('month', month);
 
+  // Cast the data to our interface
+  const records = data as unknown as HealthRecordJoin[];
+
   if (error || !records || records.length === 0) {
     throw new HttpException(httpStatus.NOT_FOUND, "No unhealthy children found for this period.");
   }
 
   try {
-    // 2. Get Nutritional Advice from AI (One call for all parents to save tokens)
+    // 2. Get Nutritional Advice from AI
     const completion = await openai.chat.completions.create({
       messages: [{ 
         role: "user", 
@@ -53,10 +70,11 @@ export const sendAlert = async () => {
 
     // 3. Dispatch Notifications
     for (const record of records) {
-      const child = record.child;
-      const parent = child?.parent;
+      // Access the first element of the joined arrays safely
+      const child = record.child?.[0];
+      const parent = child?.parent?.[0];
 
-      if (parent && parent.email) {
+      if (child && parent && parent.email) {
         const title = `Nutritional Guide for ${child.firstName} ${child.lastName}`;
         
         // Save In-App Notification
@@ -68,7 +86,7 @@ export const sendAlert = async () => {
     }
     
     return { success: true, alertedCount: records.length };
-  } catch (error) {
+  } catch (error: any) {
     throw new HttpException(httpStatus.BAD_REQUEST, `Alerting failed: ${error.message}`);
   }
 };
