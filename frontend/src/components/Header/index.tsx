@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { BsList, BsPersonCircle, BsBoxArrowRight, BsChevronDown, BsPerson } from 'react-icons/bs';
 import { supabase } from '../../../utils/supabaseClient';
+import DarkModeSwitcher from './DarkModeSwitcher';
 
 const Header = (props: {
   sidebarOpen: boolean | string | undefined;
@@ -31,31 +32,38 @@ const Header = (props: {
     <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
       <div className="flex flex-grow items-center justify-between px-4 py-4 shadow-2 md:px-6 2xl:px-11">
         
-        {/* Mobile Menu Toggle */}
+        {/* Mobile Menu Toggle & Logo */}
         <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
           <button
             onClick={(e) => {
               e.stopPropagation();
               props.setSidebarOpen(!props.sidebarOpen);
             }}
-            className="z-99999 block rounded-sm border border-stroke bg-white p-1.5 shadow-sm dark:border-strokedark dark:bg-meta-4"
+            className="z-99999 block rounded-sm border border-stroke bg-white p-1.5 shadow-sm dark:border-strokedark dark:bg-meta-4 lg:hidden"
           >
             <BsList size={24} />
           </button>
 
           <Link className="block flex-shrink-0 lg:hidden" to="/">
-            <span className="text-xl font-bold text-black dark:text-white">CFWP</span>
+            <span className="text-xl font-bold text-black dark:text-white uppercase">CFWP</span>
           </Link>
         </div>
 
+        {/* Desktop Breadcrumb/Title */}
         <div className="hidden sm:block">
           <h2 className="text-title-sm font-semibold text-black dark:text-white uppercase tracking-wider">
             Admin Dashboard
           </h2>
         </div>
 
-        {/* User Area & Dropdown */}
-        <div className="relative flex items-center gap-3 2xsm:gap-7">
+        {/* User Area, Theme Switcher & Dropdown */}
+        <div className="flex items-center gap-3 2xsm:gap-7">
+          <ul className="flex items-center gap-2 2xsm:gap-4">
+            {/* Theme Toggler */}
+            <DarkModeSwitcher />
+          </ul>
+
+          {/* User Dropdown */}
           <div className="relative">
             <button
               ref={trigger}
@@ -77,8 +85,10 @@ const Header = (props: {
             {/* Dropdown Menu */}
             <div
               ref={dropdown}
+              onFocus={() => setDropdownOpen(true)}
+              onBlur={() => setDropdownOpen(false)}
               className={`absolute right-0 mt-4 flex w-62.5 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark ${
-                dropdownOpen ? 'block' : 'hidden'
+                dropdownOpen === true ? 'block' : 'hidden'
               }`}
             >
               <ul className="flex flex-col gap-5 border-b border-stroke px-6 py-7.5 dark:border-strokedark">

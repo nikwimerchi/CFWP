@@ -27,7 +27,7 @@ const AddParentModal = ({ isOpen, onClose, onSuccess }: AddParentModalProps) => 
         family_head_name: formData.family_head_name,
         national_id: formData.national_id,
         phone_number: formData.phone_number,
-        location: `${formData.sector}, ${formData.location}`, // Combining for the directory
+        location: `${formData.sector}, ${formData.location}`, 
       },
     ]);
 

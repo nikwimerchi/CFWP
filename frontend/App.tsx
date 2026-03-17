@@ -3,41 +3,67 @@ import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import DefaultLayout from './src/layout/DefaultLayout';
 import SignIn from './pages/authentication/signin/index';
 import AdminDashboardHome from './pages/admin/AdminDashboardHome';
-import Profile from './pages/Profile';
 import Parents from './pages/admin/Parents';
-import Child from './pages/admin/ChildRecords';
- import Advisors from './pages/admin/Advisors';
+import ChildRecords from './pages/admin/ChildRecords';
+import Advisors from './pages/admin/Advisors';
+import AuditLogs from './pages/admin/AuditLogs';
+import Profile from './pages/Profile';
+import PageTitle from './PageTitle';
 
-
+// Auth Context for handling session state
 export const AuthContext = createContext<any>(null);
 export const useAuth = () => useContext(AuthContext);
 
-const AdvisorList = () => <div className="p-4 text-white uppercase font-bold">Advisor Management</div>;
-const ChildRecords = () => <div className="p-4 text-white uppercase font-bold">Child Welfare Records</div>;
-
 export default function App() {
+  // Static user for now - this will be replaced by Supabase Auth state later
   const [user] = useState({ role: 'admin', email: 'admin@cwfp.gov.rw' }); 
 
   return (
     <AuthContext.Provider value={{ user }}>
       <Routes>
+        {/* Public Routes */}
         <Route path="/auth/signin" element={<SignIn />} />
 
-        {/* Protected Routes wrapped in DefaultLayout */}
+        {/* Protected Admin Routes */}
         <Route element={<DefaultLayout><Outlet /></DefaultLayout>}>
-          <Route path="/admin/dashboard" element={<AdminDashboardHome />} />
-          <Route path="/admin/advisors/list" element={<AdvisorList />} />
-          <Route path="/admin/children/records" element={<ChildRecords />} />
-          <Route path="/admin/families/list" element={<Parents />} />
-          <Route path="/admin/children/records" element={<ChildRecords />} />
-       
-          <Route path="/admin/advisors/list" element={<Advisors />} />
+          {/* Dashboard Home */}
+          <Route 
+            path="/admin/dashboard" 
+            element={<><PageTitle title="Dashboard | CFWP" /><AdminDashboardHome /></>} 
+          />
           
-          {/* Profile and Settings */}
-          <Route path="/profile" element={<Profile />} />
+          {/* Directory Management */}
+          <Route 
+            path="/admin/advisors/list" 
+            element={<><PageTitle title="Advisors | CFWP" /><Advisors /></>} 
+          />
+          <Route 
+            path="/admin/families/list" 
+            element={<><PageTitle title="Parents | CFWP" /><Parents /></>} 
+          />
+          <Route 
+            path="/admin/children/records" 
+            element={<><PageTitle title="Child Records | CFWP" /><ChildRecords /></>} 
+          />
+
+          {/* System Security */}
+          <Route 
+            path="/admin/audit-logs" 
+            element={<><PageTitle title="Audit Logs | CFWP" /><AuditLogs /></>} 
+          />
+          
+          {/* User Settings */}
+          <Route 
+            path="/profile" 
+            element={<><PageTitle title="My Profile | CFWP" /><Profile /></>} 
+          />
+
+          {/* Redirect root to dashboard if logged in */}
+          <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/auth/signin" />} />
+        {/* Catch-all redirect to Login */}
+        <Route path="*" element={<Navigate to="/auth/signin" replace />} />
       </Routes>
     </AuthContext.Provider>
   );
