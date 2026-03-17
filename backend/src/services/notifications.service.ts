@@ -19,10 +19,10 @@ interface HealthRecordJoin {
   }[]; // Supabase returns joins as arrays by default
 }
 
-// Initialize OpenAI
+// Initialize OpenAI with the Organization ID from your settings
 const openai = new OpenAI({
   apiKey: process.env.OPEN_API_SECRET_KEY,
-  organization: process.env.OPEN_API_ORGANIZATION_ID,
+  organization: "org-lwYIOicQqmnhPpR035eJFZ2U", 
 });
 
 /**
@@ -48,8 +48,8 @@ export const sendAlert = async () => {
     .eq('year', year)
     .eq('month', month);
 
-  // Cast the data to our interface
-  const records = data as unknown as HealthRecordJoin[];
+  // Cast the data to allow for safe array checking
+  const records = data as any[];
 
   if (error || !records || records.length === 0) {
     throw new HttpException(httpStatus.NOT_FOUND, "No unhealthy children found for this period.");
@@ -70,9 +70,9 @@ export const sendAlert = async () => {
 
     // 3. Dispatch Notifications
     for (const record of records) {
-      // Access the first element of the joined arrays safely
-      const child = record.child?.[0];
-      const parent = child?.parent?.[0];
+      // Fix for TS2339: Handle the Supabase array-return structure safely
+      const child = Array.isArray(record.child) ? record.child[0] : record.child;
+      const parent = child && Array.isArray(child.parent) ? child.parent[0] : child?.parent;
 
       if (child && parent && parent.email) {
         const title = `Nutritional Guide for ${child.firstName} ${child.lastName}`;

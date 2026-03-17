@@ -1,17 +1,15 @@
 import httpStatus from "http-status";
 import OpenAI from "openai";
 import { supabase } from "../db";
-import { INotification } from "../interfaces/notifications.interface";
 import { HttpException } from "../exceptions/HttpException";
 import { calculateYearsAndMonths, isEmpty } from "../utils/util";
 import { ChatDto } from "../dtos/chat.dto"; 
 import { User } from "../models/users.model"; 
 import { Chat } from "../models/chat.model"; 
 
-
 const openai = new OpenAI({
   apiKey: process.env.OPEN_API_SECRET_KEY,
-  organization: process.env.OPEN_API_ORGANIZATION_ID,
+  organization: "org-lwYIOicQqmnhPpR035eJFZ2U", // Fixed Organization ID
 });
 
 /**
@@ -99,7 +97,7 @@ export const chatt = async (data: ChatDto, user: User): Promise<Chat> => {
     } else {
       throw new HttpException(httpStatus.BAD_REQUEST, "AI failed to generate response.");
     }
-  } catch (error: any) {
+  } catch (error: any) { // Explicitly typed as any to fix TS2339
     throw new HttpException(httpStatus.INTERNAL_SERVER_ERROR, `AI Service Error: ${error.message}`);
   }
 };

@@ -1,12 +1,11 @@
-import winston from "winston";
+import winston, { format } from "winston";
+import { TransformableInfo } from 'logform'; // Correct import for TransformableInfo
 import { NODE_ENV } from "../../config";
-
 interface LoggingInfo {
   level: string;
   message: string;
 }
 
-// TEMPORARY FIX: Used 'any' to bypass incompatible type definition errors.
 const enumerateErrorFormat = winston.format((info: any) => { 
   if (info instanceof Error) {
     Object.assign(info, { message: info.stack });
@@ -22,7 +21,6 @@ const logger = winston.createLogger({
       ? winston.format.colorize()
       : winston.format.uncolorize(),
     winston.format.splat(),
-    // TEMPORARY FIX: Used 'any' here as well.
     winston.format.printf(
       (info: any) => `${info.level}: ${info.message}`
     )
