@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { useAuth } from '../../../App'; // Go up to root App for Auth context
-import AdminSideBar from './admin'; // Local import
-import AdvisorSideBar from './advisor'; // Local import
-import ParentSideBar from './parent'; // Local import
+import { useAuth } from '../../../App';
+import AdminSideBar from './admin'; 
+import AdvisorSideBar from './advisor'; 
+import ParentSideBar from './parent'; 
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -23,6 +23,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
     storedSidebarExpanded === null ? false : storedSidebarExpanded === 'true',
   );
 
+  // Close on click outside (Mobile)
   useEffect(() => {
     const clickHandler = ({ target }: MouseEvent) => {
       if (!sidebar.current || !trigger.current) return;
@@ -33,9 +34,20 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
     return () => document.removeEventListener('click', clickHandler);
   }, [sidebarOpen]);
 
+  // Persistent sidebar state
+  useEffect(() => {
+    localStorage.setItem('sidebar-expanded', sidebarExpanded.toString());
+    if (sidebarExpanded) {
+      document.querySelector('body')?.classList.add('sidebar-expanded');
+    } else {
+      document.querySelector('body')?.classList.remove('sidebar-expanded');
+    }
+  }, [sidebarExpanded]);
+
   const getDashboardPath = () => {
     if (user?.role === 'admin') return '/admin/dashboard';
     if (user?.role === 'advisor') return '/advisor/statistics';
+    if (user?.role === 'parent') return '/parent/dashboard';
     return '/auth/signin';
   };
 
@@ -52,11 +64,20 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             CWF<span className="text-blue-500">P</span>
           </h1>
         </NavLink>
+        <button
+          ref={trigger}
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="block lg:hidden"
+        >
+          {/* Mobile toggle button */}
+        </button>
       </div>
 
       <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
         <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
-          <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2 uppercase">Main Menu</h3>
+          <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2 uppercase">
+            Main Menu
+          </h3>
           <ul className="mb-6 flex flex-col gap-1.5">
             <li>
               <NavLink
@@ -69,13 +90,19 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               </NavLink>
             </li>
 
-            {/* Role-Based Components */}
             {user?.role === 'admin' && (
-              <AdminSideBar sidebarExpanded={sidebarExpanded} setSidebarExpanded={setSidebarExpanded} />
+              <AdminSideBar 
+                sidebarExpanded={sidebarExpanded} 
+                setSidebarExpanded={setSidebarExpanded} 
+              />
             )}
             {user?.role === 'advisor' && (
-              <AdvisorSideBar sidebarExpanded={sidebarExpanded} setSidebarExpanded={setSidebarExpanded} />
+              <AdvisorSideBar 
+                sidebarExpanded={sidebarExpanded} 
+                setSidebarExpanded={setSidebarExpanded} 
+              />
             )}
+            {user?.role === 'parent' && <ParentSideBar />}
           </ul>
         </nav>
       </div>
