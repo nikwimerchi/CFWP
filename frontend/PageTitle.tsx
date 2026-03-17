@@ -12,7 +12,7 @@ const PageTitle = ({ title }: PageTitleProps) => {
     document.title = title;
   }, [location, title]);
 
-  return null; // This component doesn't render anything to the UI
+  return null; 
 };
 
 export default PageTitle;
