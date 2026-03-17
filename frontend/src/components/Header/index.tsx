@@ -1,22 +1,44 @@
-import { Link } from 'react-router-dom';
-import { BsList, BsPersonCircle } from 'react-icons/bs';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { BsList, BsPersonCircle, BsBoxArrowRight, BsChevronDown, BsPerson } from 'react-icons/bs';
+import { supabase } from '../../../utils/supabaseClient';
 
 const Header = (props: {
-  sidebarOpen: string | boolean | undefined;
+  sidebarOpen: boolean | string | undefined;
   setSidebarOpen: (arg0: boolean) => void;
 }) => {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const trigger = useRef<any>(null);
+  const dropdown = useRef<any>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const clickHandler = ({ target }: MouseEvent) => {
+      if (!dropdown.current) return;
+      if (!dropdownOpen || dropdown.current.contains(target) || trigger.current.contains(target)) return;
+      setDropdownOpen(false);
+    };
+    document.addEventListener('click', clickHandler);
+    return () => document.removeEventListener('click', clickHandler);
+  }, [dropdownOpen]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/auth/signin');
+  };
+
   return (
     <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
       <div className="flex flex-grow items-center justify-between px-4 py-4 shadow-2 md:px-6 2xl:px-11">
+        
+        {/* Mobile Menu Toggle */}
         <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
-          {/* Hamburger Toggle BTN */}
           <button
-            aria-controls="sidebar"
             onClick={(e) => {
               e.stopPropagation();
               props.setSidebarOpen(!props.sidebarOpen);
             }}
-            className="z-99999 block rounded-sm border border-stroke bg-white p-1.5 shadow-sm dark:border-strokedark dark:bg-meta-4 lg:hidden"
+            className="z-99999 block rounded-sm border border-stroke bg-white p-1.5 shadow-sm dark:border-strokedark dark:bg-meta-4"
           >
             <BsList size={24} />
           </button>
@@ -27,19 +49,57 @@ const Header = (props: {
         </div>
 
         <div className="hidden sm:block">
-          <h2 className="text-title-sm font-semibold text-black dark:text-white uppercase">
-            Portal Management
+          <h2 className="text-title-sm font-semibold text-black dark:text-white uppercase tracking-wider">
+            Admin Dashboard
           </h2>
         </div>
 
-        <div className="flex items-center gap-3 2xsm:gap-7">
-          {/* User Area */}
-          <div className="flex items-center gap-4">
-            <span className="hidden text-right lg:block">
-              <span className="block text-sm font-medium text-black dark:text-white">Admin User</span>
-              <span className="block text-xs">System Administrator</span>
-            </span>
-            <BsPersonCircle size={24} className="text-bodydark2" />
+        {/* User Area & Dropdown */}
+        <div className="relative flex items-center gap-3 2xsm:gap-7">
+          <div className="relative">
+            <button
+              ref={trigger}
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="flex items-center gap-4"
+            >
+              <span className="hidden text-right lg:block">
+                <span className="block text-sm font-medium text-black dark:text-white">Admin</span>
+                <span className="block text-xs">Administrator</span>
+              </span>
+
+              <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-meta-4 flex items-center justify-center">
+                <BsPersonCircle size={26} className="text-bodydark2" />
+              </div>
+
+              <BsChevronDown className={`hidden fill-current sm:block duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            <div
+              ref={dropdown}
+              className={`absolute right-0 mt-4 flex w-62.5 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark ${
+                dropdownOpen ? 'block' : 'hidden'
+              }`}
+            >
+              <ul className="flex flex-col gap-5 border-b border-stroke px-6 py-7.5 dark:border-strokedark">
+                <li>
+                  <Link
+                    to="/profile"
+                    className="flex items-center gap-3.5 text-sm font-medium duration-300 ease-in-out hover:text-primary lg:text-base"
+                  >
+                    <BsPerson size={22} />
+                    My Profile
+                  </Link>
+                </li>
+              </ul>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-3.5 py-4 px-6 text-sm font-medium duration-300 ease-in-out hover:text-red-500 lg:text-base"
+              >
+                <BsBoxArrowRight size={22} />
+                Log Out
+              </button>
+            </div>
           </div>
         </div>
       </div>
