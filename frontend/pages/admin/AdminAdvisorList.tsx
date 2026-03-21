@@ -1,28 +1,57 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../../utils/supabaseClient';
-import { BsSearch, BsPersonBadge, BsGeoAlt, BsTrash } from 'react-icons/bs';
+import { BsPersonPlus, BsTrash, BsPencilSquare, BsSearch } from 'react-icons/bs';
+// next dont change it src/pages/admin/)
+import AddAdvisorModal from '../../src/components/Modals/AddAdvisorModal';
+
+interface Advisor {
+  id: string;
+  full_name: string;
+  sector: string;
+  district: string;
+  created_at: string;
+}
 
 const AdminAdvisorList = () => {
-  const [advisors, setAdvisors] = useState<any[]>([]);
+  const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchAdvisors = async () => {
     try {
       setLoading(true);
-      // Fetching profiles where role is 'advisor'
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, full_name, sector, district, created_at')
         .eq('role', 'advisor')
-        .order('full_name', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setAdvisors(data || []);
-    } catch (error) {
-      console.error('Error fetching advisors:', error);
+    } catch (error: any) {
+      console.error('Fetch error:', error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to handle deleting an advisor
+  const handleDelete = async (id: string, name: string) => {
+    if (window.confirm(`Are you sure you want to delete advisor ${name}?`)) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        
+        // Update local state to remove the deleted advisor
+        setAdvisors(prev => prev.filter(adv => adv.id !== id));
+      } catch (error: any) {
+        alert('Error deleting advisor: ' + error.message);
+      }
     }
   };
 
@@ -30,86 +59,102 @@ const AdminAdvisorList = () => {
     fetchAdvisors();
   }, []);
 
-  const filteredAdvisors = advisors.filter((advisor) =>
-    advisor.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAdvisors = advisors.filter((adv) =>
+    (adv.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (adv.sector?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-2xl font-bold text-black dark:text-white">
-          Regional Advisor Management
-        </h2>
+        <h2 className="text-2xl font-bold text-black dark:text-white">Regional Advisors</h2>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="inline-flex items-center justify-center gap-2.5 rounded-md bg-primary py-2 px-6 text-center font-medium text-white hover:bg-opacity-90 transition"
+        >
+          <BsPersonPlus size={20} />
+          Add New Advisor
+        </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-5">
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-            <BsSearch />
-          </span>
-          <input
-            type="text"
-            placeholder="Search advisors by name..."
-            className="w-full rounded-lg border border-stroke bg-white py-3 pl-12 pr-5 outline-none focus:border-primary dark:border-strokedark dark:bg-boxdark"
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="rounded-sm border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1">
+        <div className="mb-4">
+          <div className="relative w-full max-w-xs">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+              <BsSearch />
+            </span>
+            <input
+              type="text"
+              placeholder="Search by name or sector..."
+              className="w-full rounded border border-stroke bg-gray py-2 pl-10 pr-4 outline-none focus:border-primary dark:border-strokedark dark:bg-meta-4"
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Advisors Table */}
-      <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
         <div className="max-w-full overflow-x-auto">
           <table className="w-full table-auto">
             <thead>
               <tr className="bg-gray-2 text-left dark:bg-meta-4">
-                <th className="py-4 px-4 font-medium text-black dark:text-white">Advisor Name</th>
-                <th className="py-4 px-4 font-medium text-black dark:text-white">Assigned Area</th>
-                <th className="py-4 px-4 font-medium text-black dark:text-white">Role Status</th>
-                <th className="py-4 px-4 font-medium text-black dark:text-white">Actions</th>
+                <th className="py-4 px-4 font-medium text-black dark:text-white">Name</th>
+                <th className="py-4 px-4 font-medium text-black dark:text-white">Location</th>
+                <th className="py-4 px-4 font-medium text-black dark:text-white">Joined Date</th>
+                <th className="py-4 px-4 font-medium text-black dark:text-white text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={4} className="p-10 text-center text-gray-500">Loading advisors...</td></tr>
-              ) : filteredAdvisors.length === 0 ? (
-                <tr><td colSpan={4} className="p-10 text-center text-gray-500">No advisors found.</td></tr>
-              ) : (
-                filteredAdvisors.map((advisor) => (
-                  <tr key={advisor.id} className="border-b border-[#eee] dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4">
+                <tr>
+                  <td colSpan={4} className="py-10 text-center">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
+                  </td>
+                </tr>
+              ) : filteredAdvisors.length > 0 ? (
+                filteredAdvisors.map((adv) => (
+                  <tr key={adv.id} className="border-b border-stroke dark:border-strokedark">
                     <td className="py-5 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                          <BsPersonBadge size={20} />
-                        </div>
-                        <h5 className="font-medium text-black dark:text-white">
-                          {advisor.full_name}
-                        </h5>
-                      </div>
+                      <p className="text-black dark:text-white">{adv.full_name}</p>
                     </td>
                     <td className="py-5 px-4">
-                      <p className="flex items-center gap-2 text-sm text-black dark:text-white">
-                        <BsGeoAlt className="text-primary" /> {advisor.sector || 'Unassigned'}
+                      <p className="text-black dark:text-white">{adv.sector}, {adv.district}</p>
+                    </td>
+                    <td className="py-5 px-4">
+                      <p className="text-black dark:text-white">
+                        {new Date(adv.created_at).toLocaleDateString()}
                       </p>
-                      <span className="text-xs text-gray-400">{advisor.district || 'N/A'}</span>
                     </td>
                     <td className="py-5 px-4">
-                      <span className="inline-flex rounded-full bg-blue-100 py-1 px-3 text-sm font-medium text-blue-600">
-                        {advisor.role.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="py-5 px-4">
-                      <button className="text-red-500 hover:text-red-700">
-                        <BsTrash size={18} />
-                      </button>
+                      <div className="flex items-center justify-center space-x-3.5">
+                        <button className="hover:text-primary transition">
+                          <BsPencilSquare size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(adv.id, adv.full_name)}
+                          className="hover:text-red-500 transition"
+                        >
+                          <BsTrash size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="py-10 text-center text-gray-500">
+                    No advisors found.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      <AddAdvisorModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={fetchAdvisors} 
+      />
     </div>
   );
 };

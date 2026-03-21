@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { BsXLg } from 'react-icons/bs';
+import React, { useState } from 'react';
 import { supabase } from '../../../utils/supabaseClient';
 
 const AddAdvisorModal = ({ isOpen, onClose, onSuccess }: any) => {
@@ -7,20 +6,41 @@ const AddAdvisorModal = ({ isOpen, onClose, onSuccess }: any) => {
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
-    phone_number: '',
-    assigned_sector: '',
+    password: 'TemporaryPassword123!',
+    province: 'Kigali',
+    district: 'Gasabo',
+    sector: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.from('advisors').insert([formData]);
-    setLoading(false);
-    if (!error) {
+
+    try {
+      // Pass data as metadata so the SQL trigger can pick it up
+      const { error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.full_name,
+            role: 'advisor',
+            province: formData.province,
+            district: formData.district,
+            sector: formData.sector,
+          },
+        },
+      });
+
+      if (error) throw error;
+      
+      alert('Advisor registered successfully!');
       onSuccess();
       onClose();
-    } else {
+    } catch (error: any) {
       alert(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -28,37 +48,46 @@ const AddAdvisorModal = ({ isOpen, onClose, onSuccess }: any) => {
 
   return (
     <div className="fixed inset-0 z-999 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-lg bg-white p-8 dark:bg-boxdark">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-black dark:text-white">Register New Advisor</h3>
-          <button onClick={onClose}><BsXLg /></button>
-        </div>
+      <div className="w-full max-w-md rounded-sm border border-stroke bg-white p-8 shadow-default dark:border-strokedark dark:bg-boxdark">
+        <h3 className="mb-6 text-xl font-bold text-black dark:text-white border-b pb-2">Register Advisor</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Full Name</label>
-            <input required type="text" className="w-full rounded border border-stroke p-2.5 dark:bg-meta-4" 
-              onChange={(e) => setFormData({...formData, full_name: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Email Address</label>
-            <input required type="email" className="w-full rounded border border-stroke p-2.5 dark:bg-meta-4" 
-              onChange={(e) => setFormData({...formData, email: e.target.value})} />
-          </div>
+          <input
+            type="text"
+            placeholder="Full Name"
+            required
+            className="w-full rounded border border-stroke p-3 outline-none dark:bg-form-input"
+            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            required
+            className="w-full rounded border border-stroke p-3 outline-none dark:bg-form-input"
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          />
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Phone Number</label>
-              <input required type="text" className="w-full rounded border border-stroke p-2.5 dark:bg-meta-4" 
-                onChange={(e) => setFormData({...formData, phone_number: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Assigned Sector</label>
-              <input required type="text" placeholder="e.g., Kicukiro" className="w-full rounded border border-stroke p-2.5 dark:bg-meta-4" 
-                onChange={(e) => setFormData({...formData, assigned_sector: e.target.value})} />
-            </div>
+            <input
+              type="text"
+              placeholder="District"
+              defaultValue="Gasabo"
+              className="rounded border border-stroke p-3 dark:bg-meta-4"
+              onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Sector"
+              required
+              className="rounded border border-stroke p-3 outline-none dark:bg-form-input"
+              onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
+            />
           </div>
-          <button type="submit" disabled={loading} className="w-full bg-primary py-3 font-medium text-white rounded hover:bg-opacity-90">
-            {loading ? 'Processing...' : 'Add Advisor'}
+          <button
+            disabled={loading}
+            className="w-full rounded bg-primary p-3 font-medium text-white hover:bg-opacity-90 disabled:bg-opacity-50"
+          >
+            {loading ? 'Creating Account...' : 'Register Advisor'}
           </button>
+          <button type="button" onClick={onClose} className="w-full text-sm text-gray-500">Cancel</button>
         </form>
       </div>
     </div>
