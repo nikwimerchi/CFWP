@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../utils/supabaseClient';
 import { BsPersonPlus, BsTrash, BsPencilSquare, BsSearch } from 'react-icons/bs';
-// next dont change it src/pages/admin/)
 import AddAdvisorModal from '../../src/components/Modals/AddAdvisorModal';
+import UpdateAdvisorModal from '../../src/components/Modals/UpdateAdvisorModal';
 
 interface Advisor {
   id: string;
@@ -16,6 +16,8 @@ const AdminAdvisorList = () => {
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedAdvisor, setSelectedAdvisor] = useState<Advisor | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchAdvisors = async () => {
@@ -36,7 +38,6 @@ const AdminAdvisorList = () => {
     }
   };
 
-  // Function to handle deleting an advisor
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete advisor ${name}?`)) {
       try {
@@ -46,13 +47,17 @@ const AdminAdvisorList = () => {
           .eq('id', id);
 
         if (error) throw error;
-        
-        // Update local state to remove the deleted advisor
         setAdvisors(prev => prev.filter(adv => adv.id !== id));
       } catch (error: any) {
         alert('Error deleting advisor: ' + error.message);
       }
     }
+  };
+
+  // Triggers the edit flow by setting the advisor and opening the modal
+  const handleEdit = (advisor: Advisor) => {
+    setSelectedAdvisor(advisor);
+    setIsEditModalOpen(true);
   };
 
   useEffect(() => {
@@ -112,25 +117,24 @@ const AdminAdvisorList = () => {
               ) : filteredAdvisors.length > 0 ? (
                 filteredAdvisors.map((adv) => (
                   <tr key={adv.id} className="border-b border-stroke dark:border-strokedark">
-                    <td className="py-5 px-4">
-                      <p className="text-black dark:text-white">{adv.full_name}</p>
+                    <td className="py-5 px-4 text-black dark:text-white">{adv.full_name}</td>
+                    <td className="py-5 px-4 text-black dark:text-white">
+                      {adv.sector}, {adv.district}
                     </td>
-                    <td className="py-5 px-4">
-                      <p className="text-black dark:text-white">{adv.sector}, {adv.district}</p>
-                    </td>
-                    <td className="py-5 px-4">
-                      <p className="text-black dark:text-white">
-                        {new Date(adv.created_at).toLocaleDateString()}
-                      </p>
+                    <td className="py-5 px-4 text-black dark:text-white">
+                      {new Date(adv.created_at).toLocaleDateString()}
                     </td>
                     <td className="py-5 px-4">
                       <div className="flex items-center justify-center space-x-3.5">
-                        <button className="hover:text-primary transition">
+                        <button 
+                          className="hover:text-primary transition"
+                          onClick={() => handleEdit(adv)}
+                        >
                           <BsPencilSquare size={18} />
                         </button>
                         <button 
-                          onClick={() => handleDelete(adv.id, adv.full_name)}
                           className="hover:text-red-500 transition"
+                          onClick={() => handleDelete(adv.id, adv.full_name)}
                         >
                           <BsTrash size={18} />
                         </button>
@@ -150,6 +154,18 @@ const AdminAdvisorList = () => {
         </div>
       </div>
 
+      {/* Edit Modal */}
+      <UpdateAdvisorModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedAdvisor(null);
+        }} 
+        onSuccess={fetchAdvisors} 
+        advisor={selectedAdvisor}
+      />
+
+      {/* Add Modal */}
       <AddAdvisorModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
