@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { Outlet } from 'react-router-dom'; // 1. Import Outlet
 import Header from '../components/Header/index';
 import Sidebar from '../components/Sidebar/index';
 
-const DefaultLayout = ({ children }: { children: React.ReactNode }) => {
+const DefaultLayout = () => { // 2. Remove { children } prop
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -19,7 +20,8 @@ const DefaultLayout = ({ children }: { children: React.ReactNode }) => {
           {/* Main Content */}
           <main>
             <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
-              {children}
+              {/* 3. Replace {children} with <Outlet /> */}
+              <Outlet />
             </div>
           </main>
         </div>

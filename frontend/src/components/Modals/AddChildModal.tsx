@@ -1,81 +1,120 @@
-import { useState, useEffect } from 'react';
-import { BsXLg } from 'react-icons/bs';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../../../utils/supabaseClient';
 
-const AddChildModal = ({ isOpen, onClose, onSuccess }: any) => {
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const AddChildModal = ({ isOpen, onClose, onSuccess }: Props) => {
   const [parents, setParents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    full_name: '',
-    family_id: '',
-    date_of_birth: '',
-    gender: 'Male',
+    first_name: '',
+    middle_name: '',
+    last_name: '',
+    dob: '',
+    sex: 'Male',
+    parent_id: '',
   });
 
   useEffect(() => {
-    if (isOpen) {
-      const fetchParents = async () => {
-        const { data } = await supabase.from('families').select('id, family_head_name');
-        if (data) setParents(data);
-      };
-      fetchParents();
-    }
+    // Fetch parents so the Advisor can link the child to a family
+    const fetchParents = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('role', 'parent');
+      if (data) setParents(data);
+    };
+    if (isOpen) fetchParents();
   }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.from('children').insert([formData]);
-    setLoading(false);
-    if (!error) {
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { error } = await supabase.from('children').insert([
+      {
+        ...formData,
+        registered_by: user?.id, // Track which Advisor registered them
+      },
+    ]);
+
+    if (error) {
+      alert(error.message);
+    } else {
       onSuccess();
       onClose();
-    } else {
-      alert(error.message);
     }
+    setLoading(false);
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-999 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-lg bg-white p-8 dark:bg-boxdark">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-black dark:text-white">Register Child</h3>
-          <button onClick={onClose}><BsXLg /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Full Name</label>
-            <input required type="text" className="w-full rounded border border-stroke p-2.5 dark:bg-meta-4" 
-              onChange={(e) => setFormData({...formData, full_name: e.target.value})} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="w-full max-w-lg rounded-sm border border-stroke bg-white p-8 shadow-default dark:border-strokedark dark:bg-boxdark">
+        <h3 className="mb-6 text-xl font-bold text-black dark:text-white">Register New Child</h3>
+        
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <input
+              type="text"
+              placeholder="First Name"
+              className="w-full rounded border-[1.5px] border-stroke py-3 px-5 outline-none transition focus:border-primary"
+              onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+              required
+            />
+            <input
+              type="text"
+              placeholder="Last Name"
+              className="w-full rounded border-[1.5px] border-stroke py-3 px-5 outline-none transition focus:border-primary"
+              onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+              required
+            />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Parent/Guardian</label>
-            <select required className="w-full rounded border border-stroke p-2.5 dark:bg-meta-4"
-              onChange={(e) => setFormData({...formData, family_id: e.target.value})}>
-              <option value="">Select a Parent</option>
-              {parents.map(p => <option key={p.id} value={p.id}>{p.family_head_name}</option>)}
+
+          <div className="grid grid-cols-2 gap-4">
+            <input
+              type="date"
+              className="w-full rounded border-[1.5px] border-stroke py-3 px-5 outline-none transition focus:border-primary"
+              onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+              required
+            />
+            <select
+              className="w-full rounded border-[1.5px] border-stroke py-3 px-5 outline-none transition focus:border-primary"
+              onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
+            >
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Date of Birth</label>
-              <input required type="date" className="w-full rounded border border-stroke p-2.5 dark:bg-meta-4" 
-                onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Gender</label>
-              <select className="w-full rounded border border-stroke p-2.5 dark:bg-meta-4"
-                onChange={(e) => setFormData({...formData, gender: e.target.value})}>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </div>
+
+          <select
+            className="w-full rounded border-[1.5px] border-stroke py-3 px-5 outline-none transition focus:border-primary"
+            onChange={(e) => setFormData({ ...formData, parent_id: e.target.value })}
+            required
+          >
+            <option value="">Select Parent / Family</option>
+            {parents.map((p) => (
+              <option key={p.id} value={p.id}>{p.full_name}</option>
+            ))}
+          </select>
+
+          <div className="flex justify-end gap-4 mt-4">
+            <button type="button" onClick={onClose} className="text-black dark:text-white">Cancel</button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded bg-primary py-3 px-6 font-medium text-white hover:bg-opacity-90"
+            >
+              {loading ? 'Saving...' : 'Register Child'}
+            </button>
           </div>
-          <button type="submit" disabled={loading} className="w-full bg-primary py-3 font-medium text-white rounded hover:bg-opacity-90">
-            {loading ? 'Registering...' : 'Register Child'}
-          </button>
         </form>
       </div>
     </div>

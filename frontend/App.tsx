@@ -1,70 +1,73 @@
-import { createContext, useContext, useState } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from './src/hooks/useAuth'; // Standard relative path
+
+// Import Layouts
 import DefaultLayout from './src/layout/DefaultLayout';
-import SignIn from './pages/authentication/signin/index';
-import AdminDashboardHome from './pages/admin/AdminDashboardHome';
-import Parents from './pages/admin/Parents';
-import ChildRecords from './pages/admin/ChildRecords';
-import Advisors from './pages/admin/Advisors';
-import AuditLogs from './pages/admin/AuditLogs';
-import Profile from './pages/Profile';
-import PageTitle from './PageTitle';
 
-// Auth Context for handling session state
-export const AuthContext = createContext<any>(null);
-export const useAuth = () => useContext(AuthContext);
+// Import Admin Pages
+import AdminDashboardHome from './pages/admin/AdminDashboardHome'; 
+import AdminAdvisorList from './pages/admin/AdminAdvisorList';
+import AdminParentList from './pages/admin/AdminParentList';
+import AdminChildRecords from './pages/admin/AdminChildRecords';
 
-export default function App() {
-  // Static user for now - this will be replaced by Supabase Auth state later
-  const [user] = useState({ role: 'admin', email: 'admin@cwfp.gov.rw' }); 
+// Import Auth Pages
+import SignIn from './pages/Authentication/SignIn';
+import SignUp from './pages/Authentication/SignUp';
+
+function App() {
+  const { role, loading } = useAuth();
+  const { pathname } = useLocation();
+
+  // Scroll to top on every route change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  // 1. Show the blue spinner while Supabase checks the session
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white dark:bg-boxdark">
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
-    <AuthContext.Provider value={{ user }}>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/auth/signin" element={<SignIn />} />
+    <Routes>
+      {/* Public Auth Routes */}
+      <Route path="/auth/signin" element={<SignIn />} />
+      <Route path="/auth/signup" element={<SignUp />} />
 
-        {/* Protected Admin Routes */}
-        <Route element={<DefaultLayout><Outlet /></DefaultLayout>}>
-          {/* Dashboard Home */}
-          <Route 
-            path="/admin/dashboard" 
-            element={<><PageTitle title="Dashboard | CFWP" /><AdminDashboardHome /></>} 
-          />
-          
-          {/* Directory Management */}
-          <Route 
-            path="/admin/advisors/list" 
-            element={<><PageTitle title="Advisors | CFWP" /><Advisors /></>} 
-          />
-          <Route 
-            path="/admin/families/list" 
-            element={<><PageTitle title="Parents | CFWP" /><Parents /></>} 
-          />
-          <Route 
-            path="/admin/children/records" 
-            element={<><PageTitle title="Child Records | CFWP" /><ChildRecords /></>} 
-          />
+      {/* 2. Protected Admin Routes - Only allow if role is 'admin' */}
+      <Route 
+        element={
+          role === 'admin' ? (
+            <DefaultLayout />
+          ) : (
+            <Navigate to="/auth/signin" state={{ from: pathname }} replace />
+          )
+        }
+      >
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="/admin/dashboard" element={<AdminDashboardHome />} />
+        <Route path="/admin/advisors/list" element={<AdminAdvisorList />} />
+        <Route path="/admin/parents/list" element={<AdminParentList />} />
+        <Route path="/admin/children/records" element={<AdminChildRecords />} />
+        <Route path="/admin/audit-logs" element={<div>Audit Logs Component</div>} />
+      </Route>
 
-          {/* System Security */}
-          <Route 
-            path="/admin/audit-logs" 
-            element={<><PageTitle title="Audit Logs | CFWP" /><AuditLogs /></>} 
-          />
-          
-          {/* User Settings */}
-          <Route 
-            path="/profile" 
-            element={<><PageTitle title="My Profile | CFWP" /><Profile /></>} 
-          />
+      {/* 3. Potential Advisor/Parent Routes (Add these as you build them) */}
+      {/* <Route element={role === 'advisor' ? <DefaultLayout /> : <Navigate to="/auth/signin" />}>
+        <Route path="/advisor/dashboard" element={<AdvisorDashboard />} />
+      </Route> 
+      */}
 
-          {/* Redirect root to dashboard if logged in */}
-          <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
-        </Route>
-
-        {/* Catch-all redirect to Login */}
-        <Route path="*" element={<Navigate to="/auth/signin" replace />} />
-      </Routes>
-    </AuthContext.Provider>
+      {/* Default Redirects */}
+      <Route path="/" element={<Navigate to="/auth/signin" replace />} />
+      <Route path="*" element={<Navigate to="/auth/signin" replace />} />
+    </Routes>
   );
 }
+
+export default App;

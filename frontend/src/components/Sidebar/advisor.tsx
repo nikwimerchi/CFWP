@@ -1,40 +1,75 @@
+import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { BsPeople, BsClipboardData, BsChevronDown } from 'react-icons/bs';
-import SidebarLinkGroup from '../SidebarLinkGroup';
+import { 
+  BsSpeedometer2, 
+  BsPersonPlus, 
+  BsCalculator, 
+  BsLayoutTextSidebarReverse 
+} from 'react-icons/bs';
 
-function AdvisorSideBar({ sidebarExpanded, setSidebarExpanded }: any) {
+interface AdvisorSideBarProps {
+  sidebarExpanded: boolean;
+  setSidebarExpanded: (arg: boolean) => void;
+}
+
+const AdvisorSideBar = ({ sidebarExpanded, setSidebarExpanded }: AdvisorSideBarProps) => {
   const { pathname } = useLocation();
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <SidebarLinkGroup activeCondition={pathname.includes('children')}>
-        {(handleClick, open) => (
-          <>
-            <NavLink
-              to="#"
-              className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${pathname.includes('children') && 'bg-graydark dark:bg-meta-4'}`}
-              onClick={(e) => { e.preventDefault(); sidebarExpanded ? handleClick() : setSidebarExpanded(true); }}
-            >
-              <BsPeople size={18} /> Children
-              <BsChevronDown className={`absolute right-4 top-1/2 -translate-y-1/2 duration-200 ${open && 'rotate-180'}`} />
-            </NavLink>
-            <div className={`translate transform overflow-hidden ${!open && 'hidden'}`}>
-              <ul className="mt-4 mb-5.5 flex flex-col gap-2.5 pl-6">
-                <li><NavLink to="/advisor/children/list" className="text-bodydark2 hover:text-white">Children List</NavLink></li>
-                <li><NavLink to="/advisor/children/new" className="text-bodydark2 hover:text-white">Register New</NavLink></li>
-              </ul>
-            </div>
-          </>
-        )}
-      </SidebarLinkGroup>
-
+    <>
+      {/* Dashboard */}
       <li>
-        <NavLink to="/advisor/measurements" className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${pathname.includes('measurements') && 'bg-graydark dark:bg-meta-4'}`}>
-          <BsClipboardData size={18} /> Health Logs
+        <NavLink
+          to="/advisor/dashboard"
+          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+            pathname === '/advisor/dashboard' && 'bg-graydark dark:bg-meta-4'
+          }`}
+        >
+          <BsSpeedometer2 size={18} />
+          Regional Overview
         </NavLink>
       </li>
-    </div>
+
+      {/* Register New Child */}
+      <li>
+        <NavLink
+          to="/advisor/register-child"
+          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+            pathname.includes('register-child') && 'bg-graydark dark:bg-meta-4'
+          }`}
+        >
+          <BsPersonPlus size={18} />
+          Register Child
+        </NavLink>
+      </li>
+
+      {/* Add Measurements */}
+      <li>
+        <NavLink
+          to="/advisor/measurements"
+          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+            pathname.includes('measurements') && 'bg-graydark dark:bg-meta-4'
+          }`}
+        >
+          <BsCalculator size={18} />
+          New Measurement
+        </NavLink>
+      </li>
+
+      {/* Local Records */}
+      <li>
+        <NavLink
+          to="/advisor/records"
+          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+            pathname.includes('records') && 'bg-graydark dark:bg-meta-4'
+          }`}
+        >
+          <BsLayoutTextSidebarReverse size={18} />
+          My Sector Records
+        </NavLink>
+      </li>
+    </>
   );
-}
+};
 
 export default AdvisorSideBar;
