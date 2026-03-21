@@ -72,13 +72,13 @@ const AdminAdvisorList = () => {
   return (
     <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-2xl font-bold text-black dark:text-white">Regional Advisors</h2>
+        <h2 className="text-2xl font-bold text-black dark:text-white">Advisors</h2>
         <button
           onClick={() => setIsModalOpen(true)}
           className="inline-flex items-center justify-center gap-2.5 rounded-md bg-primary py-2 px-6 text-center font-medium text-white hover:bg-opacity-90 transition"
         >
           <BsPersonPlus size={20} />
-          Add New Advisor
+          New
         </button>
       </div>
 

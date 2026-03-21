@@ -49,7 +49,7 @@ const AddAdvisorModal = ({ isOpen, onClose, onSuccess }: any) => {
   return (
     <div className="fixed inset-0 z-999 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-sm border border-stroke bg-white p-8 shadow-default dark:border-strokedark dark:bg-boxdark">
-        <h3 className="mb-6 text-xl font-bold text-black dark:text-white border-b pb-2">Register Advisor</h3>
+        <h3 className="mb-6 text-xl font-bold text-black dark:text-white border-b pb-2">Register</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
